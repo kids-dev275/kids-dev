@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ==========================================================================
+     Master Palette (Base Tokens)
+     ========================================================================== */
+  --color-canvas: #fbf7f2;
+  --color-surface: #fffdfc;
+  --color-surface-soft: #f6efe8;
+  --color-text-primary: #3f2b24; /* Ink */
+  --color-text-secondary: #5f4a42; /* Text */
+  --color-text-muted: #705d55; /* Muted - WCAG 2.2 AA compliant (>= 5.4:1 contrast across all backgrounds) */
+  --color-border: #e7ddd5;
+  --color-champagne: #c6a56a;
+  --color-white: #ffffff;
+
+  /* Default Storefront Theme (Neutral fallback) */
+  --color-storefront-accent: #c6a56a;
+  --color-storefront-accent-hover: #b39257;
+  --color-storefront-accent-soft: #f6efe8;
+
+  /* System State Colors */
+  --color-success: #2e6930;
+  --color-success-soft: #edf5ee;
+  --color-warning: #9a6514;
+  --color-warning-soft: #fdf7ec;
+  --color-danger: #a33b32;
+  --color-danger-soft: #fbeeed;
+}
+
+/* ==========================================================================
+   Storefront Identities (CSS Attribute Scoping)
+   ========================================================================== */
+
+/* Mini Sprouts (0–10 Years) */
+[data-storefront="mini-sprouts"],
+.theme-mini-sprouts {
+  --color-storefront-accent: #c7656c;
+  --color-storefront-accent-hover: #a84d57;
+  --color-storefront-accent-soft: #fbedea;
+}
+
+/* Teen Studio (11–16 Years) */
+[data-storefront="teen-studio"],
+.theme-teen-studio {
+  --color-storefront-accent: #875985;
+  --color-storefront-accent-hover: #684266;
+  --color-storefront-accent-soft: #f3edf5;
+}
+
+/* Aura Studio (17+ Years) */
+[data-storefront="aura-studio"],
+.theme-aura-studio {
+  --color-storefront-accent: #8b6b50;
+  --color-storefront-accent-hover: #674b37;
+  --color-storefront-accent-soft: #f5ece2;
+}
+
+/* ==========================================================================
+   Base Standards & Accessibility
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  font-family:
+    var(--font-montserrat),
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings use Editorial Serif (Prata) by default */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-prata), Georgia, serif;
+  color: var(--color-text-primary);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Accessible focus visible ring */
+:focus-visible {
+  outline: 2px solid var(--color-storefront-accent);
+  outline-offset: 2px;
+}
+
+/* Restrained media defaults */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

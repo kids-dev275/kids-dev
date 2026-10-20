@@ -1,0 +1,476 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  INACTIVE
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  ORDER_RECEIVED
+  CONFIRMED
+  IN_PRODUCTION
+  READY_TO_SHIP
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  BANK_TRANSFER
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// ============================================================================
+// 1 & 2. Admin & Admin Session
+// ============================================================================
+
+model AdminUser {
+  id           String               @id @default(uuid())
+  email        String               @unique
+  passwordHash String
+  singletonKey Int                  @unique @default(1)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  sessions     AdminSession[]
+  statusLogs   OrderStatusHistory[]
+
+  // Database CHECK enforced via migration: singletonKey = 1
+}
+
+model AdminSession {
+  id          String    @id @default(uuid())
+  adminUserId String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// 3 & 4. Customer & Customer Session
+// ============================================================================
+
+model Customer {
+  id           String            @id @default(uuid())
+  fullName     String
+  email        String            @unique
+  phone        String?
+  passwordHash String
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  sessions     CustomerSession[]
+  orders       Order[]
+  reviews      Review[]
+}
+
+model CustomerSession {
+  id         String    @id @default(uuid())
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// 5 & 6. Storefront & Hero Slides
+// ============================================================================
+
+model Storefront {
+  id         String      @id @default(uuid())
+  name       String
+  slug       String      @unique
+  ageLabel   String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  heroSlides HeroSlide[]
+  products   Product[]
+}
+
+model HeroSlide {
+  id                  String      @id @default(uuid())
+  storefrontId        String
+  heading             String
+  text                String?
+  ctaLabel            String?
+  ctaLink             String?
+  desktopImageAssetId String
+  mobileImageAssetId  String?
+  sortOrder           Int         @default(0)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  storefront          Storefront  @relation(fields: [storefrontId], references: [id], onDelete: Restrict)
+  desktopImageAsset   MediaAsset  @relation("HeroDesktopImage", fields: [desktopImageAssetId], references: [id], onDelete: Restrict)
+  mobileImageAsset    MediaAsset? @relation("HeroMobileImage", fields: [mobileImageAssetId], references: [id], onDelete: SetNull)
+
+  @@index([storefrontId, isActive, sortOrder])
+}
+
+// ============================================================================
+// 7. Media Assets (Cloudinary-backed metadata)
+// ============================================================================
+
+model MediaAsset {
+  id                String         @id @default(uuid())
+  mediaType         MediaType      @default(IMAGE)
+  provider          String         @default("cloudinary")
+  providerPublicId  String
+  secureUrl         String
+  width             Int?
+  height            Int?
+  duration          Float?
+  format            String?
+  bytes             Int?
+  createdAt         DateTime       @default(now())
+
+  productMedia      ProductMedia[]
+  heroDesktopSlides HeroSlide[]    @relation("HeroDesktopImage")
+  heroMobileSlides  HeroSlide[]    @relation("HeroMobileImage")
+  reviewMedia       ReviewMedia[]
+}
+
+// ============================================================================
+// 8, 9, 10, 11, 12, 13. Products, Variants, Media & Size Guides
+// ============================================================================
+
+model Product {
+  id               String           @id @default(uuid())
+  storefrontId     String
+  name             String
+  sku              String           @unique
+  slug             String
+  shortDescription String?
+  description      String
+  regularPrice     Decimal          @db.Decimal(10, 2)
+  compareAtPrice   Decimal?         @db.Decimal(10, 2)
+  productType      String?
+  gender           String?
+  fabric           String?
+  includedPieces   String?
+  fit              String?
+  patternDesign    String?
+  occasion         String?
+  season           String?
+  careInstructions String?
+  status           ProductStatus    @default(DRAFT)
+  isNewArrival     Boolean          @default(false)
+  seoTitle         String?
+  seoDescription   String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  storefront       Storefront       @relation(fields: [storefrontId], references: [id], onDelete: Restrict)
+  sizes            ProductSize[]
+  colors           ProductColor[]
+  variants         ProductVariant[]
+  media            ProductMedia[]
+  sizeGuide        SizeGuide?
+  orderItems       OrderItem[]
+  reviews          Review[]
+
+  @@unique([storefrontId, slug])
+  @@index([storefrontId, status])
+  @@index([storefrontId, isNewArrival, status])
+  @@index([createdAt])
+  @@index([sku])
+
+  // Database CHECK enforced via migration:
+  // regularPrice > 0
+  // compareAtPrice IS NULL OR compareAtPrice > 0
+}
+
+model ProductSize {
+  id        String           @id @default(uuid())
+  productId String
+  name      String
+  sortOrder Int              @default(0)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variants  ProductVariant[]
+
+  @@unique([productId, name])
+  @@unique([productId, id])
+  @@index([productId, sortOrder])
+}
+
+model ProductColor {
+  id        String           @id @default(uuid())
+  productId String
+  name      String
+  sortOrder Int              @default(0)
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variants  ProductVariant[]
+
+  @@unique([productId, name])
+  @@unique([productId, id])
+  @@index([productId, sortOrder])
+}
+
+model ProductVariant {
+  id             String       @id @default(uuid())
+  productId      String
+  productSizeId  String
+  productColorId String
+  isAvailable    Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size           ProductSize  @relation(fields: [productId, productSizeId], references: [productId, id], onDelete: Restrict)
+  color          ProductColor @relation(fields: [productId, productColorId], references: [productId, id], onDelete: Restrict)
+  orderItems     OrderItem[]
+
+  @@unique([productId, productSizeId, productColorId])
+  @@index([productId, isAvailable])
+}
+
+model ProductMedia {
+  id           String     @id @default(uuid())
+  productId    String
+  mediaAssetId String
+  sortOrder    Int        @default(0)
+  altText      String?
+  isMain       Boolean    @default(false)
+  isHover      Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@index([productId, sortOrder])
+
+  // PostgreSQL partial unique indexes enforced via migration:
+  // UNIQUE (productId) WHERE isMain = true
+  // UNIQUE (productId) WHERE isHover = true
+}
+
+model SizeGuide {
+  id        String         @id @default(uuid())
+  productId String         @unique
+  columns   Json
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rows      SizeGuideRow[]
+}
+
+model SizeGuideRow {
+  id          String    @id @default(uuid())
+  sizeGuideId String
+  label       String
+  values      Json
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sizeGuide   SizeGuide @relation(fields: [sizeGuideId], references: [id], onDelete: Cascade)
+
+  @@index([sizeGuideId, sortOrder])
+}
+
+// ============================================================================
+// 14, 15, 16. Orders, Order Items & Status History
+// ============================================================================
+
+model Order {
+  id             String               @id @default(uuid())
+  orderNumber    String               @unique
+  idempotencyKey String?              @unique
+  customerId     String?
+  status         OrderStatus          @default(ORDER_RECEIVED)
+  paymentMethod  PaymentMethod
+
+  fullName       String
+  phone          String
+  email          String?
+
+  address        String
+  city           String
+  province       String
+  postalCode     String?
+  orderNotes     String?
+
+  subtotal       Decimal              @db.Decimal(10, 2)
+  deliveryCharge Decimal              @db.Decimal(10, 2)
+  grandTotal     Decimal              @db.Decimal(10, 2)
+
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  customer       Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+
+  @@index([orderNumber])
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([createdAt])
+
+  // Database CHECK enforced via migration:
+  // subtotal >= 0, deliveryCharge >= 0, grandTotal >= 0
+  // PostgreSQL Sequence: order_number_seq starting at 1001
+}
+
+model OrderItem {
+  id               String          @id @default(uuid())
+  orderId          String
+  productId        String?
+  productVariantId String?
+
+  productName      String
+  sku              String
+  sizeLabel        String
+  colorName        String
+  quantity         Int
+  unitPrice        Decimal         @db.Decimal(10, 2)
+  lineSubtotal     Decimal         @db.Decimal(10, 2)
+  createdAt        DateTime        @default(now())
+
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product          Product?        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant          ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+
+  // Database CHECK enforced via migration:
+  // quantity >= 1 AND quantity <= 10
+  // unitPrice > 0
+  // lineSubtotal >= 0
+}
+
+model OrderStatusHistory {
+  id               String      @id @default(uuid())
+  orderId          String
+  status           OrderStatus
+  changedByAdminId String?
+  createdAt        DateTime    @default(now())
+
+  order            Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedByAdmin   AdminUser?  @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+}
+
+// ============================================================================
+// 17 & 18. Reviews & Review Media
+// ============================================================================
+
+model Review {
+  id           String        @id @default(uuid())
+  productId    String
+  customerId   String?
+  reviewerName String
+  rating       Int
+  reviewText   String
+  status       ReviewStatus  @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  media        ReviewMedia[]
+
+  @@index([productId, status])
+  @@index([status, createdAt])
+
+  // Database CHECK enforced via migration:
+  // rating >= 1 AND rating <= 5
+}
+
+model ReviewMedia {
+  id           String     @id @default(uuid())
+  reviewId     String
+  mediaAssetId String
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  review       Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@index([reviewId, sortOrder])
+}
+
+// ============================================================================
+// 19 & 20. Singletons: Announcement Bar & Commerce Settings
+// ============================================================================
+
+model AnnouncementBar {
+  id           String   @id @default(uuid())
+  singletonKey Int      @unique @default(1)
+  text         String?
+  link         String?
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Database CHECK enforced via migration: singletonKey = 1
+}
+
+model CommerceSettings {
+  id                     String   @id @default(uuid())
+  singletonKey           Int      @unique @default(1)
+
+  flatDeliveryCharge     Decimal  @default(300.00) @db.Decimal(10, 2)
+
+  bankName               String?
+  accountTitle           String?
+  accountOrIban          String?
+  branchCode             String?
+  branchLocation         String?
+  instructions           String?
+
+  newOrderEmailEnabled          Boolean  @default(true)
+  newOrderNotificationRecipient String?  @default("sk.fabrica@gmail.com") @map("newOrderRecipientEmail")
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  // Database CHECK enforced via migration: singletonKey = 1
+}

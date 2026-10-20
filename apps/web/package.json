@@ -1,0 +1,46 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:design-system": "tsx test/design-system.test.tsx",
+    "test:storefront-shell": "tsx test/storefront-shell.test.tsx",
+    "test:storefront-catalog": "tsx test/storefront-catalog.test.tsx",
+    "test:cart": "tsx test/cart.test.tsx",
+    "test:checkout": "tsx test/checkout.test.tsx",
+    "test:order-creation": "tsx test/order-creation.test.tsx",
+    "test:account": "tsx test/account.test.tsx",
+    "test:reviews": "tsx test/reviews.test.tsx",
+    "test:admin-ui": "tsx test/admin-ui.test.tsx",
+    "test:content-pages": "tsx test/content-pages.test.tsx",
+    "test:accessibility": "tsx test/accessibility.test.tsx",
+    "test:seo": "tsx test/seo.test.tsx"
+  },
+  "dependencies": {
+    "@kids-wear/shared": "workspace:*",
+    "lucide-react": "^1.58.0",
+    "next": "16.4.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "zod": "^3.24.2",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.8",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.21.0",
+    "eslint-config-next": "16.4.1",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.3"
+  }
+}
