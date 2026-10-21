@@ -76,18 +76,18 @@ async function main(): Promise<void> {
     update: {
       flatDeliveryCharge: 300.0,
       newOrderEmailEnabled: true,
-      newOrderRecipientEmail: "sk.fabrica@gmail.com",
+      newOrderNotificationRecipient: "sk.fabrica@gmail.com",
     },
     create: {
       singletonKey: 1,
       flatDeliveryCharge: 300.0,
       newOrderEmailEnabled: true,
-      newOrderRecipientEmail: "sk.fabrica@gmail.com",
+      newOrderNotificationRecipient: "sk.fabrica@gmail.com",
     },
   });
   // eslint-disable-next-line no-console
   console.log(
-    `  ✓ CommerceSettings singleton verified (delivery: ${settings.flatDeliveryCharge} PKR, recipient: ${settings.newOrderRecipientEmail})`
+    `  ✓ CommerceSettings singleton verified (delivery: ${settings.flatDeliveryCharge} PKR, recipient: ${settings.newOrderNotificationRecipient})`
   );
 
   // eslint-disable-next-line no-console
