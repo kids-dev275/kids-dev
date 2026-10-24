@@ -76,7 +76,7 @@ export function CheckoutOrderSummary({
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-xs font-sans pt-0.5">
+              <div className="flex items-center justify-between text-xs font-sans tabular-nums pt-0.5">
                 <span className="text-text-muted">
                   Qty: <strong className="font-medium text-ink">{item.quantity}</strong> ×{" "}
                   {formatPKR(item.unitPrice, true)}
@@ -89,7 +89,7 @@ export function CheckoutOrderSummary({
       </div>
 
       {/* Authoritative Totals */}
-      <div className="space-y-3 pt-3 border-t border-border text-sm font-sans">
+      <div className="space-y-3 pt-3 border-t border-border text-sm font-sans tabular-nums">
         <div className="flex items-center justify-between text-text-muted">
           <span>Subtotal</span>
           <span className="font-medium text-ink">{formatPKR(subtotal, true)}</span>
@@ -107,7 +107,7 @@ export function CheckoutOrderSummary({
 
         <div className="pt-3 border-t border-border flex items-baseline justify-between">
           <span className="font-semibold text-base text-ink">Total</span>
-          <span className="font-editorial text-2xl text-ink font-normal tracking-tight">
+          <span className="font-sans text-lg font-bold text-ink tabular-nums">
             {formatPKR(total, true)}
           </span>
         </div>

@@ -3,6 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
+import {
+  AdminPageHeader,
+  AdminCard,
+  AdminCardHeader,
+  AdminCardTitle,
+  AdminBadge,
+  AdminAlert,
+} from "@/components/admin/admin-ui";
 import {
   getAdminAnnouncementSettings,
   updateAdminAnnouncementSettings,
@@ -17,20 +26,11 @@ import {
   type AdminBankTransferSettings,
   type AdminNotificationSettings,
 } from "@/lib/admin-api";
-import {
-  Bell,
-  Truck,
-  Building2,
-  Mail,
-  Save,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  RefreshCw,
-} from "lucide-react";
+import { Bell, Truck, Building2, Mail, Save, Info, RefreshCw } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Announcement state
   const [announcement, setAnnouncement] = useState<AdminAnnouncementSettings>({
@@ -39,20 +39,20 @@ export default function AdminSettingsPage() {
     isActive: false,
   });
   const [savingAnnouncement, setSavingAnnouncement] = useState(false);
-  const [announcementMsg, setAnnouncementMsg] = useState<{
+  const [announcementMsg, setAnnouncementMsg, announcementFading] = useTransientFeedback<{
     type: "success" | "error";
     text: string;
-  } | null>(null);
+  }>();
 
   // Shipping state
   const [shipping, setShipping] = useState<AdminShippingSettings>({
-    flatDeliveryCharge: "250.00",
+    flatDeliveryCharge: "",
   });
   const [savingShipping, setSavingShipping] = useState(false);
-  const [shippingMsg, setShippingMsg] = useState<{
+  const [shippingMsg, setShippingMsg, shippingFading] = useTransientFeedback<{
     type: "success" | "error";
     text: string;
-  } | null>(null);
+  }>();
 
   // Bank Transfer state
   const [bankTransfer, setBankTransfer] = useState<AdminBankTransferSettings>({
@@ -64,7 +64,10 @@ export default function AdminSettingsPage() {
     instructions: "",
   });
   const [savingBank, setSavingBank] = useState(false);
-  const [bankMsg, setBankMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [bankMsg, setBankMsg, bankFading] = useTransientFeedback<{
+    type: "success" | "error";
+    text: string;
+  }>();
 
   // Notifications state
   const [notifications, setNotifications] = useState<AdminNotificationSettings>({
@@ -72,13 +75,14 @@ export default function AdminSettingsPage() {
     newOrderNotificationRecipient: "",
   });
   const [savingNotifications, setSavingNotifications] = useState(false);
-  const [notificationsMsg, setNotificationsMsg] = useState<{
+  const [notificationsMsg, setNotificationsMsg, notificationsFading] = useTransientFeedback<{
     type: "success" | "error";
     text: string;
-  } | null>(null);
+  }>();
 
   const fetchAllSettings = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const [annRes, shipRes, bankRes, notifRes] = await Promise.all([
         getAdminAnnouncementSettings(),
@@ -86,6 +90,19 @@ export default function AdminSettingsPage() {
         getAdminBankTransferSettings(),
         getAdminNotificationSettings(),
       ]);
+
+      if (
+        !annRes.success ||
+        !annRes.data?.announcement ||
+        !shipRes.success ||
+        !shipRes.data?.shipping ||
+        !bankRes.success ||
+        !bankRes.data?.bankTransfer ||
+        !notifRes.success ||
+        !notifRes.data?.notifications
+      ) {
+        setLoadError("Some settings could not be loaded. Refresh before editing.");
+      }
 
       if (annRes.success && annRes.data?.announcement) {
         setAnnouncement({
@@ -120,7 +137,7 @@ export default function AdminSettingsPage() {
         });
       }
     } catch {
-      // Handled silently
+      setLoadError("Settings could not be loaded. Refresh before editing.");
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +168,16 @@ export default function AdminSettingsPage() {
         isActive: announcement.isActive,
       });
       if (res.success && res.data) {
-        setAnnouncementMsg({ type: "success", text: "Announcement bar settings saved." });
+        const current = await getAdminAnnouncementSettings();
+        if (current.success && current.data?.announcement) {
+          setAnnouncement(current.data.announcement);
+          setAnnouncementMsg({ type: "success", text: "Announcement bar settings saved." });
+        } else {
+          setAnnouncementMsg({
+            type: "error",
+            text: "Saved, but the current announcement could not be reloaded.",
+          });
+        }
       } else {
         setAnnouncementMsg({
           type: "error",
@@ -175,11 +201,20 @@ export default function AdminSettingsPage() {
         flatDeliveryCharge: shipping.flatDeliveryCharge.trim(),
       });
       if (res.success && res.data) {
-        setShippingMsg({ type: "success", text: "Flat delivery charge saved." });
+        const current = await getAdminShippingSettings();
+        if (current.success && current.data?.shipping) {
+          setShipping(current.data.shipping);
+          setShippingMsg({ type: "success", text: "Shipping delivery charge saved." });
+        } else {
+          setShippingMsg({
+            type: "error",
+            text: "Saved, but the current delivery charge could not be reloaded.",
+          });
+        }
       } else {
         setShippingMsg({
           type: "error",
-          text: res.error?.message || "Failed to update shipping charge.",
+          text: res.error?.message || "Failed to update shipping.",
         });
       }
     } catch {
@@ -204,11 +239,20 @@ export default function AdminSettingsPage() {
         instructions: bankTransfer.instructions?.trim() || null,
       });
       if (res.success && res.data) {
-        setBankMsg({ type: "success", text: "Bank transfer settings saved." });
+        const current = await getAdminBankTransferSettings();
+        if (current.success && current.data?.bankTransfer) {
+          setBankTransfer(current.data.bankTransfer);
+          setBankMsg({ type: "success", text: "Manual bank transfer details saved." });
+        } else {
+          setBankMsg({
+            type: "error",
+            text: "Saved, but the current bank details could not be reloaded.",
+          });
+        }
       } else {
         setBankMsg({
           type: "error",
-          text: res.error?.message || "Failed to update bank transfer details.",
+          text: res.error?.message || "Failed to update bank details.",
         });
       }
     } catch {
@@ -229,7 +273,16 @@ export default function AdminSettingsPage() {
         newOrderNotificationRecipient: notifications.newOrderNotificationRecipient?.trim() || null,
       });
       if (res.success && res.data) {
-        setNotificationsMsg({ type: "success", text: "Order notification settings saved." });
+        const current = await getAdminNotificationSettings();
+        if (current.success && current.data?.notifications) {
+          setNotifications(current.data.notifications);
+          setNotificationsMsg({ type: "success", text: "Notification settings saved." });
+        } else {
+          setNotificationsMsg({
+            type: "error",
+            text: "Saved, but the current notification setting could not be reloaded.",
+          });
+        }
       } else {
         setNotificationsMsg({
           type: "error",
@@ -249,93 +302,81 @@ export default function AdminSettingsPage() {
     Boolean(bankTransfer.accountOrIban?.trim()) &&
     Boolean(bankTransfer.instructions?.trim());
 
-  if (isLoading) {
-    return (
-      <AdminGuard>
-        <AdminShell>
-          <div className="p-12 text-center text-xs uppercase tracking-wider text-brand-muted font-medium">
-            Loading settings...
-          </div>
-        </AdminShell>
-      </AdminGuard>
-    );
-  }
-
   return (
     <AdminGuard>
       <AdminShell>
         <div className="space-y-6 max-w-4xl">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-brand-sand pb-4">
-            <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-brand-ink uppercase">
-                Commerce Settings
-              </h1>
-              <p className="text-xs uppercase tracking-wider text-brand-muted mt-0.5">
-                Manage operational configuration across announcements, delivery, payments, and
-                notifications
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={fetchAllSettings}
-              className="p-2 border border-brand-sand rounded-sm text-brand-muted hover:text-brand-ink bg-white self-start sm:self-auto"
-              title="Refresh all settings"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
+          <AdminPageHeader
+            title="Commerce Settings"
+            eyebrow="Configuration"
+            description="Manage operational configuration across announcements, delivery, payments, and notifications"
+            action={
+              <button
+                type="button"
+                onClick={fetchAllSettings}
+                disabled={isLoading}
+                className="p-2 border border-brand-border rounded-sm text-brand-muted hover:text-brand-ink bg-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink disabled:opacity-50"
+                title="Refresh all settings"
+                aria-label="Refresh settings"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
+            }
+          />
+
+          {loadError && <AdminAlert type="error" message={loadError} />}
 
           {/* SECTION 1: ANNOUNCEMENT BAR */}
-          <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-4">
-            <div className="border-b border-brand-sand pb-3 flex items-center space-x-2">
-              <Bell className="w-4 h-4 text-brand-primary" />
+          <AdminCard className="p-6 space-y-4">
+            <div className="border-b border-brand-border pb-3 flex items-center space-x-2">
+              <Bell className="w-4 h-4 text-brand-ink" />
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
                 Storefront Announcement Bar
               </h2>
             </div>
 
             {announcementMsg && (
-              <div
-                className={`p-3 rounded-sm text-xs flex items-center space-x-2 ${
-                  announcementMsg.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
-              >
-                {announcementMsg.type === "success" ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                )}
-                <span>{announcementMsg.text}</span>
-              </div>
+              <AdminAlert
+                type={announcementMsg.type}
+                message={announcementMsg.text}
+                fading={announcementFading}
+                onDismiss={() => setAnnouncementMsg(null)}
+              />
             )}
 
             <form onSubmit={handleSaveAnnouncement} className="space-y-4 text-xs">
               <div>
-                <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                <label
+                  htmlFor="announcement-text"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
                   Announcement Message
                 </label>
                 <input
+                  id="announcement-text"
                   type="text"
                   value={announcement.text || ""}
                   onChange={(e) => setAnnouncement({ ...announcement, text: e.target.value })}
                   placeholder="e.g. Complimentary standard delivery on seasonal collections"
-                  className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                  className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                <label
+                  htmlFor="announcement-link"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
                   Optional Safe Link
                 </label>
                 <input
+                  id="announcement-link"
                   type="text"
                   value={announcement.link || ""}
                   onChange={(e) => setAnnouncement({ ...announcement, link: e.target.value })}
                   placeholder="e.g. /mini-sprouts/new-arrivals"
-                  className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink font-mono text-[11px]"
+                  className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                 />
                 <span className="text-[10px] text-brand-muted mt-0.5 block">
                   Must be an application relative path (e.g. /shop) or safe http(s) URL.
@@ -350,7 +391,7 @@ export default function AdminSettingsPage() {
                     onChange={(e) =>
                       setAnnouncement({ ...announcement, isActive: e.target.checked })
                     }
-                    className="w-4 h-4 rounded text-brand-primary focus:ring-brand-primary border-brand-sand"
+                    className="w-4 h-4 rounded text-brand-ink focus:ring-brand-ink border-brand-border"
                   />
                   <span className="text-xs uppercase tracking-wider font-semibold text-brand-ink">
                     Display Announcement Bar on Storefront
@@ -361,45 +402,40 @@ export default function AdminSettingsPage() {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingAnnouncement}
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-primary text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-primary/90 disabled:opacity-50"
+                  disabled={savingAnnouncement || isLoading || !!loadError}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{savingAnnouncement ? "Saving..." : "Save Announcement"}</span>
                 </button>
               </div>
             </form>
-          </div>
+          </AdminCard>
 
           {/* SECTION 2: SHIPPING SETTINGS */}
-          <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-4">
-            <div className="border-b border-brand-sand pb-3 flex items-center space-x-2">
-              <Truck className="w-4 h-4 text-brand-primary" />
+          <AdminCard className="p-6 space-y-4">
+            <div className="border-b border-brand-border pb-3 flex items-center space-x-2">
+              <Truck className="w-4 h-4 text-brand-ink" />
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
                 Shipping &amp; Delivery Charge
               </h2>
             </div>
 
             {shippingMsg && (
-              <div
-                className={`p-3 rounded-sm text-xs flex items-center space-x-2 ${
-                  shippingMsg.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
-              >
-                {shippingMsg.type === "success" ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                )}
-                <span>{shippingMsg.text}</span>
-              </div>
+              <AdminAlert
+                type={shippingMsg.type}
+                message={shippingMsg.text}
+                fading={shippingFading}
+                onDismiss={() => setShippingMsg(null)}
+              />
             )}
 
             <form onSubmit={handleSaveShipping} className="space-y-4 text-xs">
               <div className="max-w-xs">
-                <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                <label
+                  htmlFor="flat-delivery-charge"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
                   Flat Delivery Charge (PKR) *
                 </label>
                 <div className="relative">
@@ -407,12 +443,13 @@ export default function AdminSettingsPage() {
                     PKR
                   </span>
                   <input
+                    id="flat-delivery-charge"
                     type="text"
                     required
                     value={shipping.flatDeliveryCharge}
                     onChange={(e) => setShipping({ flatDeliveryCharge: e.target.value })}
-                    placeholder="250.00"
-                    className="w-full pl-12 pr-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink font-semibold"
+                    placeholder="Amount in PKR"
+                    className="w-full pl-12 pr-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink font-semibold focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
                 <span className="text-[10px] text-brand-muted mt-1 block">
@@ -421,68 +458,54 @@ export default function AdminSettingsPage() {
                 </span>
               </div>
 
-              <div className="p-3 bg-brand-canvas/40 border border-brand-sand rounded-sm text-[11px] text-brand-muted flex items-start space-x-2">
-                <Info className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+              <div className="p-3.5 bg-brand-surface-soft border border-brand-border rounded-sm text-[11px] text-brand-muted flex items-start space-x-2">
+                <Info className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>
-                  <strong>Fixed Delivery Terms:</strong> Kids Wear operates with a nationwide
-                  delivery standard of up to 10 days (made-to-order model). This promise is fixed
-                  brand content and not dynamically reconfigured in the operational settings.
+                  <strong>Fixed Delivery Terms:</strong> Pakistan-wide delivery is within 10 days.
+                  This promise is fixed brand content and not dynamically reconfigured in the
+                  operational settings.
                 </span>
               </div>
 
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingShipping}
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-primary text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-primary/90 disabled:opacity-50"
+                  disabled={savingShipping || isLoading || !!loadError}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{savingShipping ? "Saving..." : "Save Delivery Charge"}</span>
                 </button>
               </div>
             </form>
-          </div>
+          </AdminCard>
 
           {/* SECTION 3: BANK TRANSFER SETTINGS */}
-          <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-4">
-            <div className="border-b border-brand-sand pb-3 flex items-center justify-between">
+          <AdminCard className="p-6 space-y-4">
+            <div className="border-b border-brand-border pb-3 flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Building2 className="w-4 h-4 text-brand-primary" />
+                <Building2 className="w-4 h-4 text-brand-ink" />
                 <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
                   Manual Bank Transfer Details
                 </h2>
               </div>
-              <span
-                className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                  isBankTransferCustomerReady
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                    : "bg-amber-50 text-amber-800 border-amber-300"
-                }`}
-              >
+              <AdminBadge variant={isBankTransferCustomerReady ? "emerald" : "amber"}>
                 {isBankTransferCustomerReady
                   ? "Available at Checkout"
                   : "Incomplete (Hidden from Checkout)"}
-              </span>
+              </AdminBadge>
             </div>
 
             {bankMsg && (
-              <div
-                className={`p-3 rounded-sm text-xs flex items-center space-x-2 ${
-                  bankMsg.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
-              >
-                {bankMsg.type === "success" ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                )}
-                <span>{bankMsg.text}</span>
-              </div>
+              <AdminAlert
+                type={bankMsg.type}
+                message={bankMsg.text}
+                fading={bankFading}
+                onDismiss={() => setBankMsg(null)}
+              />
             )}
 
-            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-sm text-[11px] text-amber-900 flex items-start space-x-2">
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-sm text-[11px] text-amber-900 flex items-start space-x-2">
               <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
                 <strong>Checkout Availability Gate:</strong> Bank Transfer is automatically offered
@@ -495,90 +518,114 @@ export default function AdminSettingsPage() {
             <form onSubmit={handleSaveBankTransfer} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-name"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Bank Name *
                   </label>
                   <input
+                    id="bank-name"
                     type="text"
                     value={bankTransfer.bankName || ""}
                     onChange={(e) => setBankTransfer({ ...bankTransfer, bankName: e.target.value })}
                     placeholder="e.g. Meezan Bank Limited"
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-account-title"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Account Title *
                   </label>
                   <input
+                    id="bank-account-title"
                     type="text"
                     value={bankTransfer.accountTitle || ""}
                     onChange={(e) =>
                       setBankTransfer({ ...bankTransfer, accountTitle: e.target.value })
                     }
                     placeholder="e.g. Kids Wear Private Limited"
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-account-or-iban"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Account Number / IBAN *
                   </label>
                   <input
+                    id="bank-account-or-iban"
                     type="text"
                     value={bankTransfer.accountOrIban || ""}
                     onChange={(e) =>
                       setBankTransfer({ ...bankTransfer, accountOrIban: e.target.value })
                     }
-                    placeholder="e.g. PK00MEZN0001234567890123"
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink font-mono"
+                    placeholder="Enter account number or IBAN"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink font-mono focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-branch-code"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Branch Code (Optional)
                   </label>
                   <input
+                    id="bank-branch-code"
                     type="text"
                     value={bankTransfer.branchCode || ""}
                     onChange={(e) =>
                       setBankTransfer({ ...bankTransfer, branchCode: e.target.value })
                     }
                     placeholder="e.g. 0102"
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-branch-location"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Branch Location (Optional)
                   </label>
                   <input
+                    id="bank-branch-location"
                     type="text"
                     value={bankTransfer.branchLocation || ""}
                     onChange={(e) =>
                       setBankTransfer({ ...bankTransfer, branchLocation: e.target.value })
                     }
                     placeholder="e.g. DHA Phase 5 Branch, Lahore"
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                  <label
+                    htmlFor="bank-instructions"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
                     Customer Instructions *
                   </label>
                   <textarea
+                    id="bank-instructions"
                     rows={3}
                     value={bankTransfer.instructions || ""}
                     onChange={(e) =>
                       setBankTransfer({ ...bankTransfer, instructions: e.target.value })
                     }
-                    placeholder="e.g. Please share payment receipt via WhatsApp at 0300-1234567 with your Order Number."
-                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                    placeholder="Enter payment instructions shown at checkout"
+                    className="w-full px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                   />
                 </div>
               </div>
@@ -586,40 +633,32 @@ export default function AdminSettingsPage() {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingBank}
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-primary text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-primary/90 disabled:opacity-50"
+                  disabled={savingBank || isLoading || !!loadError}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{savingBank ? "Saving..." : "Save Bank Details"}</span>
                 </button>
               </div>
             </form>
-          </div>
+          </AdminCard>
 
           {/* SECTION 4: NOTIFICATIONS SETTINGS */}
-          <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-4">
-            <div className="border-b border-brand-sand pb-3 flex items-center space-x-2">
-              <Mail className="w-4 h-4 text-brand-primary" />
+          <AdminCard className="p-6 space-y-4">
+            <div className="border-b border-brand-border pb-3 flex items-center space-x-2">
+              <Mail className="w-4 h-4 text-brand-ink" />
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
                 Admin Order Notifications
               </h2>
             </div>
 
             {notificationsMsg && (
-              <div
-                className={`p-3 rounded-sm text-xs flex items-center space-x-2 ${
-                  notificationsMsg.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
-              >
-                {notificationsMsg.type === "success" ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                )}
-                <span>{notificationsMsg.text}</span>
-              </div>
+              <AdminAlert
+                type={notificationsMsg.type}
+                message={notificationsMsg.text}
+                fading={notificationsFading}
+                onDismiss={() => setNotificationsMsg(null)}
+              />
             )}
 
             <form onSubmit={handleSaveNotifications} className="space-y-4 text-xs">
@@ -634,7 +673,7 @@ export default function AdminSettingsPage() {
                         newOrderEmailEnabled: e.target.checked,
                       })
                     }
-                    className="w-4 h-4 rounded text-brand-primary focus:ring-brand-primary border-brand-sand"
+                    className="w-4 h-4 rounded text-brand-ink focus:ring-brand-ink border-brand-border"
                   />
                   <span className="text-xs uppercase tracking-wider font-semibold text-brand-ink">
                     Send Email Notification When New Orders are Placed
@@ -643,10 +682,14 @@ export default function AdminSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
+                <label
+                  htmlFor="notification-recipient"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
                   Recipient Email Address
                 </label>
                 <input
+                  id="notification-recipient"
                   type="email"
                   value={notifications.newOrderNotificationRecipient || ""}
                   onChange={(e) =>
@@ -655,16 +698,16 @@ export default function AdminSettingsPage() {
                       newOrderNotificationRecipient: e.target.value,
                     })
                   }
-                  placeholder="orders-team@kidswear.local"
-                  className="w-full max-w-md px-3 py-2 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
+                  placeholder="name@example.com"
+                  className="w-full max-w-md px-3 py-2 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
                 />
                 <span className="text-[10px] text-brand-muted mt-0.5 block">
                   Designated operations inbox to receive transaction alerts.
                 </span>
               </div>
 
-              <div className="p-3 bg-brand-canvas/40 border border-brand-sand rounded-sm text-[11px] text-brand-muted flex items-start space-x-2">
-                <Info className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+              <div className="p-3.5 bg-brand-surface-soft border border-brand-border rounded-sm text-[11px] text-brand-muted flex items-start space-x-2">
+                <Info className="w-4 h-4 text-brand-ink shrink-0 mt-0.5" />
                 <span>
                   <strong>Security &amp; Deployment Boundary:</strong> Email delivery credentials
                   and sender identities are managed exclusively via server deployment environment
@@ -675,15 +718,15 @@ export default function AdminSettingsPage() {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={savingNotifications}
-                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-primary text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-primary/90 disabled:opacity-50"
+                  disabled={savingNotifications || isLoading || !!loadError}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm text-xs uppercase tracking-wider font-semibold shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{savingNotifications ? "Saving..." : "Save Notification Settings"}</span>
                 </button>
               </div>
             </form>
-          </div>
+          </AdminCard>
         </div>
       </AdminShell>
     </AdminGuard>

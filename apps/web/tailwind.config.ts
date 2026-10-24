@@ -42,6 +42,8 @@ const config: Config = {
           muted: "var(--color-text-muted)",
           border: "var(--color-border)",
           champagne: "var(--color-champagne)",
+          primary: "var(--color-text-primary)",
+          sand: "var(--color-border)",
         },
       },
       fontFamily: {

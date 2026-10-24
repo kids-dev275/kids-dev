@@ -221,7 +221,10 @@ async function runSuite() {
       />
     );
     assert(html.includes("hover.jpg"), "Must render hover image url");
-    assert(html.includes("hidden md:block"), "Hover image must be hidden on mobile");
+    assert(
+      /class="[^"]*hidden[^"]*md:block/.test(html),
+      "Hover image must be hidden on mobile"
+    );
   });
 
   // 11. New badge only appears when requested
@@ -388,20 +391,13 @@ async function runSuite() {
     );
   });
 
-  // 25. no customer-facing Wishlist/Quick Add accidentally introduced
-  await runTest("25. no customer-facing Wishlist/Quick Add accidentally introduced", () => {
+  // 25. Quick Add remains scoped to exact variants and excludes V1 features
+  await runTest("25. Quick Add remains scoped to exact variants and excludes V1 features", () => {
     assert(
       !productCardSource.toLowerCase().includes("wishlist"),
       "ProductCard must NOT contain wishlist"
     );
-    assert(
-      !productCardSource.toLowerCase().includes("quickadd"),
-      "ProductCard must NOT contain quickAdd"
-    );
-    assert(
-      !productCardSource.toLowerCase().includes("quick add"),
-      "ProductCard must NOT contain Quick Add"
-    );
+    assert(productCardSource.includes("addProductCardVariant"), "ProductCard must use exact-variant Quick Add");
     assert(
       !productCardSource.toLowerCase().includes("rating"),
       "ProductCard must NOT contain rating"
@@ -411,8 +407,8 @@ async function runSuite() {
       "ProductCard must NOT contain reviews"
     );
     assert(
-      !productCardSource.toLowerCase().includes("cartstore"),
-      "ProductCard must NOT couple to cart state"
+      productCardSource.includes("useCartStore"),
+      "ProductCard Quick Add must reuse the existing cart store"
     );
   });
 

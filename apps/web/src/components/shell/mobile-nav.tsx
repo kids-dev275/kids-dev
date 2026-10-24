@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, ShoppingBag, User } from "lucide-react";
 import { STOREFRONT_THEMES, StorefrontSlug } from "@/components/theme/storefront-tokens";
+import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
 import { CartUnitBadge } from "@/components/cart/cart-badge";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 
@@ -51,7 +52,7 @@ export function MobileNav({ storefront }: MobileNavProps) {
   ];
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       {/* Trigger Button */}
       <button
         ref={toggleButtonRef}
@@ -93,7 +94,10 @@ export function MobileNav({ storefront }: MobileNavProps) {
             <div>
               {/* Header */}
               <div className="flex items-center justify-between pb-6 border-b border-border">
-                <span className="font-editorial text-xl text-ink">Kids Wear</span>
+                <span className="flex items-center gap-2 font-editorial text-xl text-[var(--color-storefront-contrast)]">
+                  <StorefrontIdentityIcon storefront={storefront} className="h-5 w-5" />
+                  {STOREFRONT_THEMES[storefront].name}
+                </span>
                 <button
                   type="button"
                   onClick={handleClose}
@@ -117,6 +121,7 @@ export function MobileNav({ storefront }: MobileNavProps) {
                       <Link
                         key={slug}
                         href={`/${slug}`}
+                        prefetch={false}
                         className={`flex items-center justify-between px-3 py-2 rounded-md font-sans text-sm font-medium transition-colors ${
                           isCurrent
                             ? "bg-accent-storefront text-white"

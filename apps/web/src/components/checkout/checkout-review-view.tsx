@@ -4,6 +4,7 @@ import React from "react";
 import type { CheckoutValidationResponseData, CheckoutBankTransferConfig } from "@/lib/api";
 import { formatPKR } from "@/components/commerce/price";
 import { CheckoutOrderSummary } from "./checkout-order-summary";
+import { CheckoutPrimaryAction } from "./checkout-primary-action";
 import {
   CheckCircle2,
   Edit3,
@@ -207,17 +208,16 @@ export function CheckoutReviewView({
           )}
 
           <div className="space-y-2">
-            <button
+            <CheckoutPrimaryAction
               type="button"
               onClick={onPlaceOrder}
               disabled={isSubmittingOrder}
               aria-busy={isSubmittingOrder}
               data-testid="place-order-button"
-              className="w-full min-h-[50px] px-6 py-3.5 rounded-xl font-sans text-sm font-semibold tracking-wide bg-ink text-white hover:bg-ink/90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 shadow-subtle cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <span>{isSubmittingOrder ? "Placing Order..." : "Place Order"}</span>
               {!isSubmittingOrder && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
-            </button>
+            </CheckoutPrimaryAction>
 
             <p className="text-[11px] font-sans text-center text-text-muted">
               {paymentMethod === "CASH_ON_DELIVERY"

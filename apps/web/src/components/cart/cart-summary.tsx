@@ -33,10 +33,10 @@ export function CartSummary({
         Order Summary
       </h3>
 
-      <div className="space-y-3 text-sm font-sans">
+      <div className="space-y-3 text-sm font-sans tabular-nums">
         <div className="flex items-center justify-between text-text-muted">
           <span>Subtotal</span>
-          <span className="font-medium text-ink">{formatPKR(subtotal, true)}</span>
+          <span className="font-semibold text-ink">{formatPKR(subtotal, true)}</span>
         </div>
 
         <div className="flex items-center justify-between text-text-muted">
@@ -51,7 +51,7 @@ export function CartSummary({
 
         <div className="pt-3 border-t border-border flex items-baseline justify-between">
           <span className="font-semibold text-base text-ink">Estimated Total</span>
-          <span className="font-editorial text-2xl text-ink font-normal tracking-tight">
+          <span className="font-sans text-lg font-bold text-ink tabular-nums">
             {formatPKR(total, true)}
           </span>
         </div>
@@ -84,7 +84,7 @@ export function CartSummary({
         ) : (
           <Link
             href="/checkout"
-            className="w-full min-h-[48px] px-6 py-3 rounded-lg font-sans text-sm font-semibold tracking-wide bg-ink text-white hover:bg-ink/90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 shadow-subtle cursor-pointer"
+            className="w-full min-h-[48px] px-6 py-3 rounded-lg font-sans text-sm font-semibold tracking-wide bg-[var(--color-storefront-contrast)] text-white hover:bg-[var(--color-storefront-accent-hover)] active:scale-[0.99] transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-storefront-contrast)] shadow-subtle cursor-pointer"
           >
             <span>Proceed to Checkout</span>
             <ArrowRight className="h-4 w-4" aria-hidden="true" />

@@ -64,6 +64,11 @@ export interface ApiProductCard {
     url: string;
     altText: string | null;
   } | null;
+  quickAdd?: {
+    colors: ApiProductOption[];
+    sizes: ApiProductOption[];
+    variants: Array<Pick<ApiProductVariant, "id" | "productSizeId" | "productColorId">>;
+  };
 }
 
 export interface ApiProductsResponse {
@@ -434,6 +439,7 @@ export async function validateCart(
   try {
     const res = await fetch(url, {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -993,6 +999,7 @@ export async function fetchPublicReviews(params?: {
   limit?: number;
   productId?: string;
   storefrontSlug?: string;
+  sort?: "newest" | "rating";
 }): Promise<PublicReviewsResponseData | null> {
   const baseUrl = getApiBaseUrl();
   const searchParams = new URLSearchParams();
@@ -1000,6 +1007,7 @@ export async function fetchPublicReviews(params?: {
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.productId) searchParams.set("productId", params.productId);
   if (params?.storefrontSlug) searchParams.set("storefrontSlug", params.storefrontSlug);
+  if (params?.sort) searchParams.set("sort", params.sort);
 
   const queryStr = searchParams.toString();
   const url = `${baseUrl}/reviews${queryStr ? `?${queryStr}` : ""}`;

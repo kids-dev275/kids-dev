@@ -5,6 +5,9 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { getSafeNextUrl } from "../src/lib/safe-redirect";
+import { FormField, FieldLabel } from "../src/components/ui/form/form-field";
+import { Input } from "../src/components/ui/form/input";
+import { PasswordField } from "../src/components/account/customer-auth-ui";
 import { ORDER_STATUS_LABELS, PAYMENT_METHODS } from "@kids-wear/shared";
 import type {
   CustomerProfileData,
@@ -19,6 +22,45 @@ interface TestResult {
 }
 
 const results: TestResult[] = [];
+
+function assertAuthFields(
+  source: string,
+  fields: { label: string; input: "Input" | "PasswordField"; visibilityLabel?: string }[]
+): void {
+  const fieldBlocks = source.match(/<FormField\b[^>]*>[\s\S]*?<\/FormField>/g) || [];
+
+  for (const [index, field] of fields.entries()) {
+    const block = fieldBlocks.find((candidate) =>
+      candidate.includes(`>${field.label}</FieldLabel>`)
+    );
+    assert.ok(block, `Must render ${field.label} inside a FormField`);
+    assert.ok(block.includes(`<${field.input}`), `${field.label} must contain ${field.input}`);
+
+    const id = `auth-field-${index}`;
+    const html = renderToStaticMarkup(
+      <FormField id={id}>
+        <FieldLabel className="auth-label">{field.label}</FieldLabel>
+        {field.input === "PasswordField" ? (
+          <PasswordField visibilityLabel={field.visibilityLabel || "password"} />
+        ) : (
+          <Input />
+        )}
+      </FormField>
+    );
+    assert.match(html, new RegExp(`<label\\b[^>]*for="${id}"[^>]*>`),
+      `${field.label} label must target the input`);
+    assert.ok(html.includes(`>${field.label}</label>`), `${field.label} must be the visible label`);
+    assert.ok(html.includes(`id="${id}"`), `${field.label} input must match its label`);
+    if (field.input === "PasswordField") {
+      assert.ok(html.includes('type="password"'), "Password must be masked initially");
+      assert.ok(html.includes('<button type="button"'), "Visibility control must be keyboard-operable");
+      assert.ok(html.includes(`aria-label="Show ${field.visibilityLabel || "password"}"`),
+        "Visibility control must have an accessible name");
+      assert.ok(html.includes('aria-pressed="false"'), "Visibility state must be announced");
+      assert.ok(html.includes("focus-visible:ring-2"), "Visibility control must show keyboard focus");
+    }
+  }
+}
 
 async function runTest(name: string, fn: () => void | Promise<void>): Promise<void> {
   try {
@@ -354,14 +396,10 @@ async function runSuite() {
   console.log("\nSection 4: Customer Login Page");
 
   await runTest("24. Login page includes email and password form fields with labels", () => {
-    assert.ok(
-      loginSource.includes("<FieldLabel>Email Address</FieldLabel>"),
-      "Must render email label"
-    );
-    assert.ok(
-      loginSource.includes("<FieldLabel>Password</FieldLabel>"),
-      "Must render password label"
-    );
+    assertAuthFields(loginSource, [
+      { label: "Email Address", input: "Input" },
+      { label: "Password", input: "PasswordField" },
+    ]);
   });
 
   await runTest("25. Login page enforces client validation for email format", () => {
@@ -427,26 +465,13 @@ async function runSuite() {
   await runTest(
     "32. Registration page includes fullName, email, phone, password, and confirmPassword",
     () => {
-      assert.ok(
-        registerSource.includes("<FieldLabel>Full Name</FieldLabel>"),
-        "Must render full name label"
-      );
-      assert.ok(
-        registerSource.includes("<FieldLabel>Email Address</FieldLabel>"),
-        "Must render email label"
-      );
-      assert.ok(
-        registerSource.includes("<FieldLabel>Phone Number (Optional)</FieldLabel>"),
-        "Must render phone label"
-      );
-      assert.ok(
-        registerSource.includes("<FieldLabel>Password</FieldLabel>"),
-        "Must render password label"
-      );
-      assert.ok(
-        registerSource.includes("<FieldLabel>Confirm Password</FieldLabel>"),
-        "Must render confirm password label"
-      );
+      assertAuthFields(registerSource, [
+        { label: "Full Name", input: "Input" },
+        { label: "Email Address", input: "Input" },
+        { label: "Phone Number (Optional)", input: "Input" },
+        { label: "Password", input: "PasswordField" },
+        { label: "Confirm Password", input: "PasswordField", visibilityLabel: "confirm password" },
+      ]);
     }
   );
 

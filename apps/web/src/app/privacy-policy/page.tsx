@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { StorefrontShell } from "@/components/shell/storefront-shell";
+import { SharedStorefrontShell } from "@/components/shell/storefront-shell";
 import { PolicyContainer } from "@/components/layout/policy-container";
 import { fetchPublicSettings } from "@/lib/api";
 
@@ -20,7 +20,7 @@ export default async function PrivacyPolicyPage() {
   const settings = await fetchPublicSettings();
 
   return (
-    <StorefrontShell storefront="mini-sprouts" announcement={settings?.announcement}>
+    <SharedStorefrontShell announcement={settings?.announcement}>
       <PolicyContainer
         badge="Data & Privacy"
         title="Privacy Policy"
@@ -212,6 +212,6 @@ export default async function PrivacyPolicyPage() {
           </address>
         </section>
       </PolicyContainer>
-    </StorefrontShell>
+    </SharedStorefrontShell>
   );
 }

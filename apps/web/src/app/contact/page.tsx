@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import { Phone, Mail, MapPin } from "lucide-react";
-import { StorefrontShell } from "@/components/shell/storefront-shell";
+import { SharedStorefrontShell } from "@/components/shell/storefront-shell";
 import { PolicyContainer } from "@/components/layout/policy-container";
 import { fetchPublicSettings } from "@/lib/api";
 
@@ -20,15 +20,16 @@ export default async function ContactPage() {
   const settings = await fetchPublicSettings();
 
   return (
-    <StorefrontShell storefront="mini-sprouts" announcement={settings?.announcement}>
+    <SharedStorefrontShell announcement={settings?.announcement}>
       <PolicyContainer
+        wide
         badge="Customer Support"
         title="Contact Kids Wear"
         description="We are here to help with your orders, sizing guidance, and product inquiries. Reach out to our dedicated team using our confirmed contact channels below."
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+        <div className="grid grid-cols-1 gap-6 pt-2 md:grid-cols-2 lg:grid-cols-3">
           {/* Phone Card */}
-          <div className="p-6 rounded-lg bg-surface border border-border shadow-subtle flex flex-col justify-between">
+          <div className="flex min-w-0 flex-col justify-between rounded-lg border border-border bg-surface p-6 shadow-subtle">
             <div>
               <div className="h-10 w-10 rounded-full bg-surface-soft border border-border flex items-center justify-center text-accent-storefront mb-4">
                 <Phone className="h-5 w-5" aria-hidden="true" />
@@ -52,7 +53,7 @@ export default async function ContactPage() {
           </div>
 
           {/* Email Card */}
-          <div className="p-6 rounded-lg bg-surface border border-border shadow-subtle flex flex-col justify-between">
+          <div className="flex min-w-0 flex-col justify-between rounded-lg border border-border bg-surface p-6 shadow-subtle">
             <div>
               <div className="h-10 w-10 rounded-full bg-surface-soft border border-border flex items-center justify-center text-accent-storefront mb-4">
                 <Mail className="h-5 w-5" aria-hidden="true" />
@@ -61,7 +62,7 @@ export default async function ContactPage() {
               <p className="font-sans text-xs text-text-muted mb-4">
                 Written support & order assistance
               </p>
-              <p className="font-sans text-base font-semibold text-ink break-all">
+              <p className="whitespace-nowrap font-sans text-sm font-semibold text-ink sm:text-base">
                 info@thekidswear.com
               </p>
             </div>
@@ -76,7 +77,7 @@ export default async function ContactPage() {
           </div>
 
           {/* Business Address Card */}
-          <div className="p-6 rounded-lg bg-surface border border-border shadow-subtle flex flex-col justify-between">
+          <div className="flex min-w-0 flex-col justify-between rounded-lg border border-border bg-surface p-6 shadow-subtle">
             <div>
               <div className="h-10 w-10 rounded-full bg-surface-soft border border-border flex items-center justify-center text-accent-storefront mb-4">
                 <MapPin className="h-5 w-5" aria-hidden="true" />
@@ -112,6 +113,6 @@ export default async function ContactPage() {
           </div>
         </section>
       </PolicyContainer>
-    </StorefrontShell>
+    </SharedStorefrontShell>
   );
 }

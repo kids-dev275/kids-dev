@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useTransition, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useCart } from "@/lib/cart-store";
@@ -9,6 +9,7 @@ import { LoadingState, ErrorState, EmptyCartState } from "@/components/commerce/
 import { CartLineItem } from "./cart-line-item";
 import { CartInvalidLineItem } from "./cart-invalid-line-item";
 import { CartSummary } from "./cart-summary";
+import { getCartViewState } from "./cart-view-state";
 
 export function CartView() {
   const { items, isHydrated, totalUnits, updateQuantity, removeItem } = useCart();
@@ -16,42 +17,48 @@ export function CartView() {
   const [validationData, setValidationData] = useState<ApiCartValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState<boolean>(true);
   const [validationError, setValidationError] = useState<boolean>(false);
+  const validationRequestId = useRef(0);
 
   // Perform authoritative cart validation
   const revalidateCart = useCallback(async () => {
-    if (items.length === 0) {
-      setValidationData({
-        items: [],
-        validItems: [],
-        invalidItems: [],
-        subtotal: "0.00",
-        deliveryCharge: "0.00",
-        total: "0.00",
-      });
-      setIsValidating(false);
-      setValidationError(false);
-      return;
-    }
-
+    const requestId = ++validationRequestId.current;
     setIsValidating(true);
     setValidationError(false);
+    try {
+      if (items.length === 0) {
+        setValidationData({
+          items: [],
+          validItems: [],
+          invalidItems: [],
+          subtotal: "0.00",
+          deliveryCharge: "0.00",
+          total: "0.00",
+        });
+        return;
+      }
 
-    const payload = items.map((i) => ({
-      productId: i.productId,
-      variantId: i.variantId,
-      quantity: i.quantity,
-    }));
+      const payload = items.map((i) => ({
+        productId: i.productId,
+        variantId: i.variantId,
+        quantity: i.quantity,
+      }));
+      const result = await validateCart(payload);
+      if (requestId !== validationRequestId.current) return;
 
-    const result = await validateCart(payload);
-
-    if (result) {
-      setValidationData(result);
-      setValidationError(false);
-    } else {
-      setValidationError(true);
+      if (result) {
+        setValidationData(result);
+      } else {
+        setValidationData(null);
+        setValidationError(true);
+      }
+    } catch {
+      if (requestId === validationRequestId.current) {
+        setValidationData(null);
+        setValidationError(true);
+      }
+    } finally {
+      if (requestId === validationRequestId.current) setIsValidating(false);
     }
-
-    setIsValidating(false);
   }, [items]);
 
   // Initial and reactive validation when stored cart state updates
@@ -71,6 +78,7 @@ export function CartView() {
 
     return () => {
       isCancelled = true;
+      validationRequestId.current += 1;
     };
   }, [isHydrated, revalidateCart]);
 
@@ -84,8 +92,16 @@ export function CartView() {
     removeItem(variantId);
   };
 
+  const viewState = getCartViewState(
+    isHydrated,
+    items.length,
+    isValidating,
+    validationData !== null,
+    validationError
+  );
+
   // 1. Loading / Initial Hydration State
-  if (!isHydrated || (isValidating && !validationData)) {
+  if (viewState === "loading") {
     return (
       <div className="py-16 sm:py-24 min-h-[420px] flex items-center justify-center">
         <LoadingState
@@ -97,7 +113,7 @@ export function CartView() {
   }
 
   // 2. Empty Cart State
-  if (items.length === 0) {
+  if (viewState === "empty") {
     return (
       <div className="py-16 sm:py-24 min-h-[420px] flex items-center justify-center">
         <EmptyCartState shopHref="/" />
@@ -106,7 +122,7 @@ export function CartView() {
   }
 
   // 3. API Outage Error State (Customer cart is preserved)
-  if (validationError && !validationData) {
+  if (viewState === "error") {
     return (
       <div className="py-16 sm:py-24 min-h-[420px] flex items-center justify-center">
         <ErrorState

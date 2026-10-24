@@ -37,6 +37,7 @@
 /* Mini Sprouts (0–10 Years) */
 [data-storefront="mini-sprouts"],
 .theme-mini-sprouts {
+  --color-storefront-contrast: #98454c;
   --color-storefront-accent: #c7656c;
   --color-storefront-accent-hover: #a84d57;
   --color-storefront-accent-soft: #fbedea;
@@ -45,6 +46,7 @@
 /* Teen Studio (11–16 Years) */
 [data-storefront="teen-studio"],
 .theme-teen-studio {
+  --color-storefront-contrast: #684266;
   --color-storefront-accent: #875985;
   --color-storefront-accent-hover: #684266;
   --color-storefront-accent-soft: #f3edf5;
@@ -53,6 +55,7 @@
 /* Aura Studio (17+ Years) */
 [data-storefront="aura-studio"],
 .theme-aura-studio {
+  --color-storefront-contrast: #674b37;
   --color-storefront-accent: #8b6b50;
   --color-storefront-accent-hover: #674b37;
   --color-storefront-accent-soft: #f5ece2;
@@ -125,5 +128,14 @@ video {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@keyframes storefront-hero-in {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
   }
 }

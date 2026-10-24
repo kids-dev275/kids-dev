@@ -46,6 +46,9 @@ export interface AdminProductListItem {
   status: "DRAFT" | "PUBLISHED" | "INACTIVE";
   isNewArrival: boolean;
   updatedAt: string;
+  thumbnailUrl?: string | null;
+  variantCount?: number;
+  availableVariantCount?: number;
   storefront?: {
     id: string;
     name: string;
@@ -488,8 +491,8 @@ export async function getAdminProductVariants(
 export async function bulkCreateAdminProductVariants(
   productId: string,
   variants: Array<{ productSizeId: string; productColorId: string; isAvailable?: boolean }>
-): Promise<ApiResponse<{ variants: AdminProductVariant[]; count: number }>> {
-  return adminFetch<{ variants: AdminProductVariant[]; count: number }>(
+): Promise<ApiResponse<{ variants: AdminProductVariant[] }>> {
+  return adminFetch<{ variants: AdminProductVariant[] }>(
     `/admin/products/${productId}/variants/bulk`,
     {
       method: "POST",
@@ -515,7 +518,8 @@ export async function updateAdminProductVariant(
 // Product Media
 export async function getAdminProductMediaUploadSignature(
   productId: string,
-  mediaType: "IMAGE" | "VIDEO"
+  mediaType: "IMAGE" | "VIDEO",
+  videoCrop?: { x: number; y: number; width: number; height: number }
 ): Promise<
   ApiResponse<{
     timestamp: number;
@@ -525,11 +529,12 @@ export async function getAdminProductMediaUploadSignature(
     folder: string;
     publicId: string;
     resourceType: "image" | "video";
+    transformation?: string;
   }>
 > {
   return adminFetch(`/admin/products/${productId}/media/upload-signature`, {
     method: "POST",
-    body: JSON.stringify({ mediaType }),
+    body: JSON.stringify({ mediaType, ...(videoCrop && { videoCrop }) }),
   });
 }
 
@@ -548,6 +553,16 @@ export async function registerAdminProductMedia(
   });
 }
 
+export async function replaceAdminProductVideo(
+  productId: string,
+  publicId: string
+): Promise<ApiResponse<{ media: AdminProductMedia }>> {
+  return adminFetch<{ media: AdminProductMedia }>(
+    `/admin/products/${productId}/media/replace-video`,
+    { method: "POST", body: JSON.stringify({ publicId, mediaType: "VIDEO" }) }
+  );
+}
+
 export async function getAdminProductMedia(
   productId: string
 ): Promise<ApiResponse<{ media: AdminProductMedia[] }>> {
@@ -558,11 +573,11 @@ export async function getAdminProductMedia(
 
 export async function reorderAdminProductMedia(
   productId: string,
-  items: Array<{ productMediaId: string; sortOrder: number }>
+  mediaIds: string[]
 ): Promise<ApiResponse<{ media: AdminProductMedia[] }>> {
   return adminFetch<{ media: AdminProductMedia[] }>(`/admin/products/${productId}/media/reorder`, {
     method: "PATCH",
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ mediaIds }),
   });
 }
 

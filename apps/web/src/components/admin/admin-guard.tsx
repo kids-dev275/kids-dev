@@ -26,7 +26,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
         aria-live="polite"
         aria-busy="true"
       >
-        <div className="w-10 h-10 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mb-4" />
+        <div className="w-10 h-10 border-2 border-brand-ink border-t-transparent rounded-full animate-spin mb-4" />
         <p className="text-xs uppercase tracking-widest text-brand-muted font-medium">
           Verifying Admin Authorization...
         </p>

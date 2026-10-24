@@ -6,6 +6,7 @@ export interface StorefrontSwitcherProps {
   currentStorefront: StorefrontSlug;
   className?: string;
   variant?: "pill" | "compact";
+  homepage?: boolean;
 }
 
 const STOREFRONT_SLUGS: StorefrontSlug[] = ["mini-sprouts", "teen-studio", "aura-studio"];
@@ -18,6 +19,7 @@ export function StorefrontSwitcher({
   currentStorefront,
   className = "",
   variant = "pill",
+  homepage = false,
 }: StorefrontSwitcherProps) {
   return (
     <nav
@@ -37,10 +39,11 @@ export function StorefrontSwitcher({
             <Link
               key={slug}
               href={`/${slug}`}
+              prefetch={false}
               aria-current={isCurrent ? "page" : undefined}
               className={`px-3 py-1 rounded-full font-sans font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront ${
                 isCurrent
-                  ? "bg-accent-storefront text-white shadow-subtle font-semibold"
+                  ? `${homepage ? "bg-[var(--color-storefront-contrast)]" : "bg-accent-storefront"} text-white shadow-subtle font-semibold`
                   : "text-text-base hover:text-ink hover:bg-surface-soft"
               }`}
             >

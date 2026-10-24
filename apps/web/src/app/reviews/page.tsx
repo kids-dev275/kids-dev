@@ -2,7 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchPublicSettings, fetchPublicReviews, fetchEligibleProductsForReview } from "@/lib/api";
-import { StorefrontShell } from "@/components/shell/storefront-shell";
+import { SharedStorefrontShell } from "@/components/shell/storefront-shell";
 import { PageContainer } from "@/components/layout/page-container";
 import { ReviewCard } from "@/components/reviews/review-card";
 import { ReviewSubmissionForm } from "@/components/reviews/review-submission-form";
@@ -36,7 +36,7 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
   const pagination = reviewsData?.pagination;
 
   return (
-    <StorefrontShell storefront="mini-sprouts" announcement={settings?.announcement}>
+    <SharedStorefrontShell announcement={settings?.announcement}>
       <PageContainer className="py-8 sm:py-12">
         {/* Header */}
         <div className="mb-10 text-center max-w-2xl mx-auto">
@@ -142,6 +142,6 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
           </div>
         </div>
       </PageContainer>
-    </StorefrontShell>
+    </SharedStorefrontShell>
   );
 }

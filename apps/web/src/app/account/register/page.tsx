@@ -6,11 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCustomerAuth } from "@/lib/customer-auth-context";
 import { registerCustomer } from "@/lib/api";
 import { getSafeNextUrl } from "@/lib/safe-redirect";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormField, FieldLabel, FieldError, FieldHint } from "@/components/ui/form";
 import { Input } from "@/components/ui/form/input";
-import { Alert, LoadingSpinner } from "@/components/ui/feedback";
+import { Alert } from "@/components/ui/feedback";
+import {
+  CustomerAuthCard,
+  PasswordField,
+  authButtonClassName,
+  authInputClassName,
+  authLabelClassName,
+} from "@/components/account/customer-auth-ui";
 
 function RegisterForm() {
   const router = useRouter();
@@ -134,129 +140,132 @@ function RegisterForm() {
     : "/account/login";
 
   return (
-    <div className="max-w-md mx-auto py-6 sm:py-10">
-      <Card className="p-6 sm:p-8 space-y-6">
-        <div className="space-y-1.5 text-center">
-          <span className="text-xs uppercase tracking-wider font-semibold text-accent-storefront font-sans">
-            New Customer
-          </span>
-          <h1 className="font-editorial text-2xl sm:text-3xl text-ink font-normal">
-            Create an Account
-          </h1>
-          <p className="text-xs sm:text-sm text-text-muted font-sans">
-            Join Kids Wear to view your orders and manage your profile.
-          </p>
+    <CustomerAuthCard
+      variant="register"
+      eyebrow="New Customer"
+      heading="Create Your Account"
+      description="Create an account to view your orders and manage your profile."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link
+            href={loginHref}
+            className="font-semibold text-accent-storefront hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+          >
+            Sign In
+          </Link>
+        </>
+      }
+    >
+      {serverError && (
+        <Alert variant="error" title="Registration Error">
+          {serverError}
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <FormField isInvalid={!!errors.fullName} isRequired>
+          <FieldLabel className={authLabelClassName}>Full Name</FieldLabel>
+          <Input
+            type="text"
+            autoComplete="name"
+            placeholder="e.g. Fatima Ali"
+            className={authInputClassName}
+            value={fullName}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          {errors.fullName && <FieldError>{errors.fullName}</FieldError>}
+        </FormField>
+
+        <FormField isInvalid={!!errors.email} isRequired>
+          <FieldLabel className={authLabelClassName}>Email Address</FieldLabel>
+          <Input
+            type="email"
+            autoComplete="email"
+            placeholder="customer@example.com"
+            className={authInputClassName}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          {errors.email && <FieldError>{errors.email}</FieldError>}
+        </FormField>
+
+        <FormField isInvalid={!!errors.phone}>
+          <FieldLabel className={authLabelClassName}>Phone Number (Optional)</FieldLabel>
+          <Input
+            type="tel"
+            autoComplete="tel"
+            placeholder="03001234567"
+            className={authInputClassName}
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          <FieldHint>
+            Optional contact number (7–20 characters) for delivery coordination.
+          </FieldHint>
+          {errors.phone && <FieldError>{errors.phone}</FieldError>}
+        </FormField>
+
+        <FormField isInvalid={!!errors.password} isRequired>
+          <FieldLabel className={authLabelClassName}>Password</FieldLabel>
+          <PasswordField
+            visibilityLabel="password"
+            autoComplete="new-password"
+            placeholder="Between 8 and 128 characters"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          <FieldHint>Must be between 8 and 128 characters.</FieldHint>
+          {errors.password && <FieldError>{errors.password}</FieldError>}
+        </FormField>
+
+        <FormField isInvalid={!!errors.confirmPassword} isRequired>
+          <FieldLabel className={authLabelClassName}>Confirm Password</FieldLabel>
+          <PasswordField
+            visibilityLabel="confirm password"
+            autoComplete="new-password"
+            placeholder="Re-enter password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              if (errors.confirmPassword)
+                setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          {errors.confirmPassword && <FieldError>{errors.confirmPassword}</FieldError>}
+        </FormField>
+
+        <div className="pt-1">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+            className={authButtonClassName}
+          >
+            Create Account
+          </Button>
         </div>
-
-        {serverError && (
-          <Alert variant="error" title="Registration Error">
-            {serverError}
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <FormField isInvalid={!!errors.fullName} isRequired>
-            <FieldLabel>Full Name</FieldLabel>
-            <Input
-              type="text"
-              autoComplete="name"
-              placeholder="e.g. Fatima Ali"
-              value={fullName}
-              onChange={(e) => {
-                setFullName(e.target.value);
-                if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            {errors.fullName && <FieldError>{errors.fullName}</FieldError>}
-          </FormField>
-
-          <FormField isInvalid={!!errors.email} isRequired>
-            <FieldLabel>Email Address</FieldLabel>
-            <Input
-              type="email"
-              autoComplete="email"
-              placeholder="customer@example.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            {errors.email && <FieldError>{errors.email}</FieldError>}
-          </FormField>
-
-          <FormField isInvalid={!!errors.phone}>
-            <FieldLabel>Phone Number (Optional)</FieldLabel>
-            <Input
-              type="tel"
-              autoComplete="tel"
-              placeholder="03001234567"
-              value={phone}
-              onChange={(e) => {
-                setPhone(e.target.value);
-                if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            <FieldHint>
-              Optional contact number (7–20 characters) for delivery coordination.
-            </FieldHint>
-            {errors.phone && <FieldError>{errors.phone}</FieldError>}
-          </FormField>
-
-          <FormField isInvalid={!!errors.password} isRequired>
-            <FieldLabel>Password</FieldLabel>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              placeholder="Between 8 and 128 characters"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            <FieldHint>Must be between 8 and 128 characters.</FieldHint>
-            {errors.password && <FieldError>{errors.password}</FieldError>}
-          </FormField>
-
-          <FormField isInvalid={!!errors.confirmPassword} isRequired>
-            <FieldLabel>Confirm Password</FieldLabel>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              placeholder="Re-enter password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                if (errors.confirmPassword)
-                  setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            {errors.confirmPassword && <FieldError>{errors.confirmPassword}</FieldError>}
-          </FormField>
-
-          <div className="pt-2">
-            <Button type="submit" variant="primary" fullWidth isLoading={isSubmitting}>
-              Create Account
-            </Button>
-          </div>
-        </form>
-
-        <div className="text-center pt-2 border-t border-border">
-          <p className="text-xs sm:text-sm text-text-muted font-sans">
-            Already have an account?{" "}
-            <Link href={loginHref} className="text-accent-storefront font-semibold hover:underline">
-              Sign In
-            </Link>
-          </p>
-        </div>
-      </Card>
-    </div>
+      </form>
+    </CustomerAuthCard>
   );
 }
 
@@ -264,8 +273,8 @@ export default function CustomerRegisterPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-md mx-auto py-6 sm:py-10">
-          <div className="p-6 sm:p-8 space-y-6 border border-border rounded-lg bg-surface min-h-[580px] animate-pulse" />
+        <div className="mx-auto max-w-[560px] py-3 sm:py-5">
+          <div className="min-h-[760px] animate-pulse rounded-[24px] border border-border bg-surface" />
         </div>
       }
     >

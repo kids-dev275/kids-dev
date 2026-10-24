@@ -1578,6 +1578,23 @@ async function runSuite(): Promise<void> {
     assert(typeof item.slug === "string", "slug missing");
     assert(typeof item.regularPrice === "string", "regularPrice missing");
     assert(item.mainImage !== null, "mainImage missing");
+    assert(item.quickAdd.colors.length > 0, "Available color names must be present");
+    assert(item.quickAdd.sizes.length > 0, "Active sizes must be present");
+    assert(item.quickAdd.variants.length > 0, "Available exact variants must be present");
+    assert(
+      !item.quickAdd.colors.some((color: { name: string }) => color.name === "Mint Green"),
+      "Color with no available variant must not appear"
+    );
+    assert(
+      !item.quickAdd.colors.some((color: { name: string }) => color.name === "Inactive Color"),
+      "Inactive color must not appear"
+    );
+    for (const variant of item.quickAdd.variants) {
+      assert(
+        item.quickAdd.colors.some((color: { id: string }) => color.id === variant.productColorId),
+        "Each quick-add variant must reference a visible color"
+      );
+    }
     assert(!("status" in item), "Must not expose status");
     assert(!("description" in item), "Card must not contain full description");
   });

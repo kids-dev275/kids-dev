@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminOrder, updateAdminOrderStatus } from "@/lib/admin-api";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
 import type { AdminOrderDetailData, OrderStatusType } from "@kids-wear/shared";
 import {
   ArrowLeft,
@@ -30,7 +31,7 @@ export default function AdminOrderDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
 
   const fetchOrder = useCallback(async () => {
     if (!orderNumber) return;
@@ -220,7 +221,7 @@ export default function AdminOrderDetailPage() {
 
           {successMessage && (
             <div
-              className="p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs"
+              className={`p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs transition-opacity duration-300 ${successFading ? "opacity-0" : "opacity-100"}`}
               role="status"
             >
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -363,13 +364,13 @@ export default function AdminOrderDetailPage() {
                           • Color:{" "}
                           <span className="font-medium text-brand-ink">{item.colorName}</span>
                         </div>
-                        <div className="text-[11px] text-brand-muted mt-1">
+                        <div className="font-sans tabular-nums text-[11px] text-brand-muted mt-1">
                           Qty: <span className="font-semibold text-brand-ink">{item.quantity}</span>{" "}
                           × PKR {item.unitPrice}
                         </div>
                       </div>
 
-                      <div className="text-right font-semibold text-brand-ink whitespace-nowrap">
+                      <div className="text-right font-sans tabular-nums font-semibold text-brand-ink whitespace-nowrap">
                         PKR {item.lineSubtotal}
                       </div>
                     </div>
@@ -377,7 +378,7 @@ export default function AdminOrderDetailPage() {
                 </div>
 
                 {/* Financial Summary */}
-                <div className="pt-4 border-t border-brand-sand space-y-1.5 text-xs">
+                <div className="pt-4 border-t border-brand-sand space-y-1.5 text-xs font-sans tabular-nums">
                   <div className="flex justify-between text-brand-muted">
                     <span>Subtotal</span>
                     <span>PKR {order.subtotal}</span>
@@ -402,7 +403,7 @@ export default function AdminOrderDetailPage() {
                 <div className="space-y-4">
                   {order.statusHistory.map((hist, index) => (
                     <div key={hist.id} className="flex items-start space-x-3 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-brand-primary mt-1.5 shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-brand-ink mt-1.5 shrink-0" />
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
                           <span className="font-semibold text-brand-ink">{hist.statusLabel}</span>

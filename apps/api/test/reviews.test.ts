@@ -1068,6 +1068,59 @@ async function main() {
       }
     });
 
+    await runTest("36a. storefront review ranking returns top-rated published reviews first", async () => {
+      const rankedReviews = [];
+      for (const [name, rating, createdAt] of [
+        ["Rated Five Older", 5, "2026-01-01T00:00:00.000Z"],
+        ["Rated Five Newer", 5, "2026-01-02T00:00:00.000Z"],
+        ["Rated Four", 4, "2026-01-03T00:00:00.000Z"],
+        ["Rated Three", 3, "2026-01-04T00:00:00.000Z"],
+      ] as const) {
+        const review = await prisma.review.create({
+          data: {
+            productId: eligibleProductId,
+            reviewerName: name,
+            rating,
+            createdAt: new Date(createdAt),
+            reviewText: "Published review for storefront ranking verification.",
+            status: ReviewStatus.APPROVED,
+          },
+        });
+        rankedReviews.push(review);
+        createdReviewIds.push(review.id);
+      }
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/v1/reviews?productId=${eligibleProductId}&storefrontSlug=mini-sprouts&sort=rating&limit=4`,
+      });
+      assert(res.statusCode === 200, "Must return 200");
+      const reviews = JSON.parse(res.body).data.reviews;
+      assert(reviews.length === 4, "Must return exactly the top four reviews");
+      assert(
+        reviews.every((review: { rating: number }) => review.rating === 5),
+        "Lower-rated reviews must fall outside the top four"
+      );
+      const ids = reviews.map((review: { id: string }) => review.id);
+      assert(ids.includes(rankedReviews[0].id), "Older five-star review must be present");
+      assert(ids.includes(rankedReviews[1].id), "Newer five-star review must be present");
+      assert(
+        ids.indexOf(rankedReviews[1].id) < ids.indexOf(rankedReviews[0].id),
+        "Equal-rated reviews must rank newest first"
+      );
+      for (let i = 0; i < reviews.length; i++) {
+        assert(reviews[i].product.storefrontSlug === "mini-sprouts", "Must stay in storefront");
+        if (i > 0) {
+          assert(reviews[i - 1].rating >= reviews[i].rating, "Must rank by rating descending");
+          if (reviews[i - 1].rating === reviews[i].rating) {
+            assert(
+              reviews[i - 1].createdAt >= reviews[i].createdAt,
+              "Must rank equal ratings newest first"
+            );
+          }
+        }
+      }
+    });
+
     await runTest("37. response excludes moderation/internal fields", async () => {
       const res = await app.inject({
         method: "GET",

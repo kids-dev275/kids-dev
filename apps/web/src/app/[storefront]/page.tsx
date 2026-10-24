@@ -15,12 +15,7 @@ import {
 import { StorefrontShell } from "@/components/shell/storefront-shell";
 import { PageContainer } from "@/components/layout/page-container";
 import { HeroSlider } from "@/components/home/hero-slider";
-import { ShopByAge } from "@/components/home/shop-by-age";
-import { NewArrivalsSection } from "@/components/home/new-arrivals-section";
-import { EditorialBrandSection } from "@/components/home/editorial-brand-section";
-import { WhyKidsWear } from "@/components/home/why-kids-wear";
-import { ReviewsPreview } from "@/components/home/reviews-preview";
-import { ContactSection } from "@/components/home/contact-section";
+import { StorefrontHomeSections } from "@/components/home/storefront-home-sections";
 
 interface StorefrontPageProps {
   params: Promise<{ storefront: string }>;
@@ -64,11 +59,12 @@ export default async function StorefrontHomePage({ params }: StorefrontPageProps
   }
 
   // Parallel server-side fetching
-  const [settings, storefrontData, newArrivals, reviewsData] = await Promise.all([
+  const [settings, storefrontData, newArrivals, catalog, reviewsData] = await Promise.all([
     fetchPublicSettings(),
     fetchStorefront(storefront),
     fetchStorefrontProducts(storefront, { isNewArrival: true, limit: 4 }),
-    fetchPublicReviews({ storefrontSlug: storefront, limit: 3 }),
+    fetchStorefrontProducts(storefront, { limit: 8 }),
+    fetchPublicReviews({ storefrontSlug: storefront, limit: 4, sort: "rating" }),
   ]);
 
   // If all public backend services are unreachable, trigger the customer-safe error boundary
@@ -118,26 +114,13 @@ export default async function StorefrontHomePage({ params }: StorefrontPageProps
       <HeroSlider storefront={storefront as StorefrontSlug} slides={storefrontData?.heroSlides} />
 
       <PageContainer>
-        {/* 2. Shop by Age / Cross-Storefront Discovery */}
-        <ShopByAge currentStorefront={storefront as StorefrontSlug} />
-
-        {/* 3. New Arrivals / Product Preview */}
-        <NewArrivalsSection
+        <StorefrontHomeSections
           storefront={storefront as StorefrontSlug}
-          products={newArrivals?.items}
+          newArrivals={newArrivals?.items || []}
+          catalog={catalog?.items || []}
+          reviews={reviewsData?.reviews || []}
+          flatDeliveryCharge={settings?.shipping?.flatDeliveryCharge}
         />
-
-        {/* 4. Editorial Storytelling Banner */}
-        <EditorialBrandSection storefront={storefront as StorefrontSlug} />
-
-        {/* 5. Why Kids Wear / Logistics Standards */}
-        <WhyKidsWear flatDeliveryCharge={settings?.shipping?.flatDeliveryCharge} />
-
-        {/* 6. Reviews Preview Placeholder / Live Reviews */}
-        <ReviewsPreview reviews={reviewsData?.reviews} />
-
-        {/* 7. Contact / Studio Channels */}
-        <ContactSection />
       </PageContainer>
     </StorefrontShell>
   );

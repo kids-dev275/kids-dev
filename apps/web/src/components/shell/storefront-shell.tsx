@@ -5,6 +5,7 @@ import { AnnouncementBar } from "./announcement-bar";
 import { Header } from "./header";
 import { Footer } from "./footer";
 import type { ApiAnnouncement } from "@/lib/api";
+import { getActiveStorefront } from "@/lib/storefront-preference";
 
 export interface StorefrontShellProps {
   storefront: StorefrontSlug;
@@ -35,7 +36,7 @@ export function StorefrontShell({ storefront, announcement, children }: Storefro
       </a>
 
       {/* Global Announcement */}
-      <AnnouncementBar announcement={announcement} />
+      <AnnouncementBar announcement={announcement} themed />
 
       {/* Storefront Header */}
       <Header storefront={storefront} />
@@ -48,5 +49,18 @@ export function StorefrontShell({ storefront, announcement, children }: Storefro
       {/* Storefront Footer */}
       <Footer />
     </StorefrontScope>
+  );
+}
+
+/** Resolves cookie context only for routes without a storefront slug. */
+export async function SharedStorefrontShell({
+  announcement,
+  children,
+}: Omit<StorefrontShellProps, "storefront">) {
+  const storefront = await getActiveStorefront();
+  return (
+    <StorefrontShell storefront={storefront} announcement={announcement}>
+      {children}
+    </StorefrontShell>
   );
 }

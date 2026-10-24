@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import type { MediaAsset, PrismaClient, ProductMedia } from "@prisma/client";
 import { getPrismaClient } from "../../lib/prisma";
-import { getCloudinaryService } from "../../lib/cloudinary";
+import { getCloudinaryService, type CloudinaryResourceMetadata } from "../../lib/cloudinary";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/errors";
 import { requireAdmin, requireAdminCsrf } from "../admin-auth/guards";
 import {
@@ -49,6 +49,46 @@ function formatProductMedia(media: ProductMedia & { mediaAsset: MediaAsset }) {
   };
 }
 
+async function verifyUploadedMedia(
+  productId: string,
+  publicId: string,
+  mediaType: "IMAGE" | "VIDEO"
+): Promise<CloudinaryResourceMetadata> {
+  if (!publicId.startsWith(`kids-wear/products/${productId}/`)) {
+    throw new BadRequestError(
+      "Public ID does not belong to this product upload namespace",
+      "PRODUCT_MEDIA_FOREIGN_PRODUCT"
+    );
+  }
+
+  const resourceType = mediaType === "IMAGE" ? "image" : "video";
+  const metadata = await getCloudinaryService().fetchResourceMetadata(publicId, resourceType);
+  if (metadata.resourceType !== resourceType) {
+    throw new BadRequestError(
+      `Resource type '${metadata.resourceType}' does not match requested '${resourceType}'`,
+      "MEDIA_RESOURCE_TYPE_INVALID"
+    );
+  }
+  if (mediaType === "IMAGE" && (metadata.width !== 1200 || metadata.height !== 1500)) {
+    throw new BadRequestError(
+      `Product image dimensions must be exactly 1200x1500 (4:5). Received ${metadata.width}x${metadata.height}`,
+      "MEDIA_DIMENSIONS_INVALID"
+    );
+  }
+  if (mediaType === "VIDEO") {
+    if (metadata.format.toLowerCase() !== "mp4") {
+      throw new BadRequestError("Product video must be MP4", "MEDIA_FORMAT_INVALID");
+    }
+    if (metadata.width !== 1080 || metadata.height !== 1350) {
+      throw new BadRequestError(
+        `Product video dimensions must be exactly 1080x1350 (4:5). Received ${metadata.width}x${metadata.height}`,
+        "MEDIA_DIMENSIONS_INVALID"
+      );
+    }
+  }
+  return metadata;
+}
+
 export const adminProductMediaRoutes: FastifyPluginAsync = async (
   app: FastifyInstance
 ): Promise<void> => {
@@ -72,11 +112,12 @@ export const adminProductMediaRoutes: FastifyPluginAsync = async (
         throw new BadRequestError(firstError, "VALIDATION_ERROR");
       }
 
-      const { mediaType } = parseResult.data;
+      const { mediaType, videoCrop } = parseResult.data;
       const cloudinaryService = getCloudinaryService();
       const signatureResult = await cloudinaryService.createUploadSignature({
         productId,
         mediaType,
+        ...(videoCrop && { videoCrop }),
       });
 
       reply.status(200).send({
@@ -106,47 +147,7 @@ export const adminProductMediaRoutes: FastifyPluginAsync = async (
 
       const { publicId, mediaType, altText, sortOrder } = parseResult.data;
 
-      // Namespace validation: publicId must strictly belong to this product's namespace
-      const expectedPrefix = `kids-wear/products/${productId}/`;
-      if (!publicId.startsWith(expectedPrefix)) {
-        throw new BadRequestError(
-          "Public ID does not belong to this product upload namespace",
-          "PRODUCT_MEDIA_FOREIGN_PRODUCT"
-        );
-      }
-
-      // Fetch authoritative Cloudinary metadata
-      const cloudinaryService = getCloudinaryService();
-      const intendedResourceType = mediaType === "IMAGE" ? "image" : "video";
-      const metadata = await cloudinaryService.fetchResourceMetadata(
-        publicId,
-        intendedResourceType
-      );
-
-      // Verify resource type matches intended type
-      if (metadata.resourceType !== intendedResourceType) {
-        throw new BadRequestError(
-          `Resource type '${metadata.resourceType}' does not match requested '${intendedResourceType}'`,
-          "MEDIA_RESOURCE_TYPE_INVALID"
-        );
-      }
-
-      // Authoritative dimension enforcement
-      if (mediaType === "IMAGE") {
-        if (metadata.width !== 1200 || metadata.height !== 1500) {
-          throw new BadRequestError(
-            `Product image dimensions must be exactly 1200x1500 (4:5). Received ${metadata.width}x${metadata.height}`,
-            "MEDIA_DIMENSIONS_INVALID"
-          );
-        }
-      } else if (mediaType === "VIDEO") {
-        if (metadata.width !== 1080 || metadata.height !== 1350) {
-          throw new BadRequestError(
-            `Product video dimensions must be exactly 1080x1350 (4:5). Received ${metadata.width}x${metadata.height}`,
-            "MEDIA_DIMENSIONS_INVALID"
-          );
-        }
-      }
+      const metadata = await verifyUploadedMedia(productId, publicId, mediaType);
 
       // Concurrency-safe limit enforcement & atomic persistence
       const createdMedia = await prisma.$transaction(async (tx) => {
@@ -224,6 +225,53 @@ export const adminProductMediaRoutes: FastifyPluginAsync = async (
           media: formatProductMedia(createdMedia),
         },
       });
+    }
+  );
+
+  // Replace the existing video association atomically after the new upload is verified.
+  app.post<{ Params: { productId: string } }>(
+    "/:productId/media/replace-video",
+    { preHandler: [requireAdmin, requireAdminCsrf] },
+    async (request, reply) => {
+      const { productId } = request.params;
+      await getProductOrThrow(prisma, productId);
+      const parseResult = registerProductMediaSchema.safeParse(request.body);
+      if (!parseResult.success || parseResult.data.mediaType !== "VIDEO") {
+        throw new BadRequestError("A valid product video is required", "VALIDATION_ERROR");
+      }
+      const metadata = await verifyUploadedMedia(productId, parseResult.data.publicId, "VIDEO");
+
+      const updatedMedia = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId}::text FOR UPDATE`;
+        const current = await tx.productMedia.findFirst({
+          where: { productId, mediaAsset: { mediaType: "VIDEO" } },
+        });
+        if (!current) {
+          throw new NotFoundError(
+            "Product video not found. Use Upload Video instead.",
+            "PRODUCT_VIDEO_NOT_FOUND"
+          );
+        }
+        const asset = await tx.mediaAsset.create({
+          data: {
+            mediaType: "VIDEO",
+            provider: "cloudinary",
+            providerPublicId: metadata.publicId,
+            secureUrl: metadata.secureUrl,
+            width: metadata.width,
+            height: metadata.height,
+            duration: metadata.duration ?? null,
+            format: metadata.format,
+            bytes: metadata.bytes,
+          },
+        });
+        return tx.productMedia.update({
+          where: { id: current.id },
+          data: { mediaAssetId: asset.id, isMain: false, isHover: false },
+          include: { mediaAsset: true },
+        });
+      });
+      reply.status(200).send({ success: true, data: { media: formatProductMedia(updatedMedia) } });
     }
   );
 

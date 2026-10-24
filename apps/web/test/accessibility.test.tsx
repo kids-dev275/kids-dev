@@ -101,7 +101,7 @@ async function runSuite() {
       html.includes('<main id="main-content"'),
       "Gateway must render <main id='main-content'>"
     );
-    assert(html.includes("<footer"), "Gateway must render <footer>");
+    assert(!html.includes("<footer"), "Gateway must remain without a footer");
   });
 
   // 5. AdminShell renders Skip to main content link and semantic landmarks
@@ -194,9 +194,9 @@ async function runSuite() {
     );
   });
 
-  // 11. ProductPurchaseConfigurator renders fieldset/legend with role="radiogroup"
+  // 11. ProductPurchaseConfigurator renders fieldset/legend with labeled toggle-button groups
   await runTest(
-    '11. ProductPurchaseConfigurator renders fieldset/legend with role="radiogroup"',
+    '11. ProductPurchaseConfigurator renders fieldset/legend with labeled toggle-button groups',
     () => {
       const html = renderToStaticMarkup(
         <ProductPurchaseConfigurator
@@ -208,9 +208,9 @@ async function runSuite() {
       );
       assert(html.includes("<fieldset"), "Must render fieldset elements for options");
       assert(html.includes("<legend"), "Must render legend elements for option categories");
-      assert(html.includes('role="radiogroup"'), "Must render role='radiogroup' for option sets");
-      assert(html.includes('aria-label="Select Color"'), "Must label color option radiogroup");
-      assert(html.includes('aria-label="Select Size"'), "Must label size option radiogroup");
+      assert(html.includes('role="group"'), "Must group toggle buttons semantically");
+      assert(html.includes('aria-label="Select Color"'), "Must label color option group");
+      assert(html.includes('aria-label="Select Size"'), "Must label size option group");
     }
   );
 

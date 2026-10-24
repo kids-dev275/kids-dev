@@ -1,8 +1,9 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { ArrowUpRight } from "lucide-react";
-import { STOREFRONT_THEMES, StorefrontSlug } from "@/components/theme/storefront-tokens";
+import { MapPin, Phone, Mail, ArrowRight } from "lucide-react";
+import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
 
 export const metadata: Metadata = {
   title: "Kids Wear",
@@ -44,45 +45,73 @@ const organizationJsonLd = {
   },
 };
 
-interface GatewayPanelData {
-  slug: StorefrontSlug;
-  subtitle: string;
+interface GatewayCardData {
+  slug: "mini-sprouts" | "teen-studio" | "aura-studio";
+  title: string;
+  age: string;
   description: string;
-  accentBg: string;
-  borderColor: string;
+  srDescription: string;
+  cta: string;
+  link: string;
+  image: string;
+  imageAlt: string;
+  accentColor: string;
+  panelBg: string;
+  objectPosition: string;
 }
 
-const GATEWAY_PANELS: GatewayPanelData[] = [
+const GATEWAY_CARDS: GatewayCardData[] = [
   {
     slug: "mini-sprouts",
-    subtitle: "0–10 Years",
-    description: "Explore Kids Wear apparel for ages 0–10.",
-    accentBg: "hover:border-[#C7656C] focus-visible:ring-[#C7656C]",
-    borderColor: "border-[#C7656C]/30",
+    title: "Mini Sprouts",
+    age: "0–10 Years",
+    description: "Playful Outfits for Their Brightest Days",
+    srDescription: "Explore Kids Wear apparel for ages 0–10.",
+    cta: "Explore Collection",
+    link: "/mini-sprouts",
+    image: "/images/gateway/gateway-mini-sprouts.webp",
+    imageAlt: "Children apparel by Mini Sprouts for 0–10 Years",
+    accentColor: "#C7656C",
+    panelBg: "#FAF0F1",
+    objectPosition: "center top",
   },
   {
     slug: "teen-studio",
-    subtitle: "11–16 Years",
-    description: "Explore Kids Wear apparel for ages 11–16.",
-    accentBg: "hover:border-[#875985] focus-visible:ring-[#875985]",
-    borderColor: "border-[#875985]/30",
+    title: "Teen Studio",
+    age: "11–16 Years",
+    description: "Trendy Styles for Every Mood",
+    srDescription: "Explore Kids Wear apparel for ages 11–16.",
+    cta: "Explore Collection",
+    link: "/teen-studio",
+    image: "/images/gateway/gateway-teen-studio.webp",
+    imageAlt: "Teen apparel by Teen Studio for 11–16 Years",
+    accentColor: "#875985",
+    panelBg: "#F5EFF5",
+    objectPosition: "center top",
   },
   {
     slug: "aura-studio",
-    subtitle: "17+ Years",
-    description: "Explore Kids Wear apparel for ages 17 and above.",
-    accentBg: "hover:border-[#8B6B50] focus-visible:ring-[#8B6B50]",
-    borderColor: "border-[#8B6B50]/30",
+    title: "Aura Studio",
+    age: "17+ Years",
+    description: "Modern Looks for What’s Next",
+    srDescription: "Explore Kids Wear apparel for ages 17 and above.",
+    cta: "Explore Collection",
+    link: "/aura-studio",
+    image: "/images/gateway/gateway-aura-studio.webp",
+    imageAlt: "Young adult apparel by Aura Studio for 17+ Years",
+    accentColor: "#8B6B50",
+    panelBg: "#F6EFE8",
+    objectPosition: "center top",
   },
 ];
 
 export default function GatewayPage() {
   return (
-    <div className="min-h-screen bg-canvas flex flex-col justify-between selection:bg-champagne/30">
+    <div className="min-h-screen lg:h-screen lg:max-h-dvh flex flex-col justify-between bg-[#FBF7F2] selection:bg-champagne/30 text-brand-ink lg:overflow-hidden">
       {/* Skip to Main Content Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-ink focus:text-white focus:rounded focus:ring-2 focus:ring-ink"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-ink focus:text-white focus:rounded focus:ring-2 focus:ring-champagne"
       >
         Skip to main content
       </a>
@@ -93,80 +122,180 @@ export default function GatewayPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
       />
 
-      {/* Brand Header */}
-      <header className="pt-8 sm:pt-12 pb-6 px-4 sm:px-8 text-center max-w-4xl mx-auto">
-        <span className="inline-block text-xs uppercase tracking-[0.25em] font-sans font-semibold text-text-muted mb-3">
-          Three Age-Based Storefronts
-        </span>
-        <h1 className="font-editorial text-4xl sm:text-5xl lg:text-6xl text-ink font-normal tracking-tight">
-          Kids Wear
-        </h1>
-        <p className="mt-3 font-sans text-sm sm:text-base text-text-base/80 max-w-xl mx-auto leading-relaxed">
-          Select a storefront to explore Kids Wear apparel designed for each age group, delivered
-          across Pakistan within 10 days.
-        </p>
+      {/* Semantic Accessible Heading for Document Outline */}
+      <h1 className="sr-only">Kids Wear</h1>
+
+      {/* Three-Part Editorial Header */}
+      <header className="w-full border-b border-brand-border/60 bg-white/40 backdrop-blur-xs shrink-0">
+        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-2 sm:gap-4">
+            {/* Left: Business Address */}
+            <div className="hidden md:flex items-center gap-2.5 text-xs lg:text-[13px] text-brand-muted">
+              <MapPin className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
+              <div className="leading-snug">
+                <p className="font-medium text-brand-ink text-xs lg:text-[13px]">Street-05, Darul Islam Colony</p>
+                <p className="text-brand-muted text-[11px] lg:text-xs">Attock, Pakistan</p>
+              </div>
+            </div>
+
+            {/* Center: Kids Wear Logo & Tagline */}
+            <div className="flex flex-col items-center justify-center text-center">
+              <Image
+                src="/brand/kids-wear-logo.webp"
+                alt="Kids Wear"
+                width={120}
+                height={78}
+                priority
+                className="w-[90px] sm:w-[100px] md:w-[110px] lg:w-[118px] h-auto object-contain"
+              />
+              <p className="font-editorial italic text-[11px] sm:text-xs text-brand-text/80 tracking-wide mt-0.5">
+                Little Styles. Brighter Tomorrows.
+              </p>
+            </div>
+
+            {/* Right: Phone & Email */}
+            <div className="hidden md:flex flex-col items-end justify-center gap-0.5 text-xs lg:text-[13px] text-brand-muted">
+              <a
+                href="tel:+923350981321"
+                className="inline-flex items-center gap-1.5 text-brand-ink hover:text-champagne transition-colors font-medium text-xs lg:text-[13px]"
+              >
+                <Phone className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
+                <span>+92 335 0981321</span>
+              </a>
+              <a
+                href="mailto:info@thekidswear.com"
+                className="inline-flex items-center gap-1.5 text-brand-text hover:text-champagne transition-colors text-[11px] lg:text-xs"
+              >
+                <Mail className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
+                <span>info@thekidswear.com</span>
+              </a>
+            </div>
+
+            {/* Mobile-only Address & Contact Bar */}
+            <div className="flex md:hidden items-center justify-between text-[11px] text-brand-muted border-t border-brand-border/40 pt-2 mt-1">
+              <div className="flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-champagne shrink-0" aria-hidden="true" />
+                <span className="truncate">Attock, Pakistan</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <a
+                  href="tel:+923350981321"
+                  className="inline-flex items-center gap-1 text-brand-ink hover:text-champagne font-medium"
+                >
+                  <Phone className="w-3 h-3 text-champagne" aria-hidden="true" />
+                  <span>+92 335 0981321</span>
+                </a>
+                <a
+                  href="mailto:info@thekidswear.com"
+                  className="inline-flex items-center gap-1 text-brand-muted hover:text-champagne"
+                  aria-label="Email info@thekidswear.com"
+                >
+                  <Mail className="w-3 h-3 text-champagne" aria-hidden="true" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* 3-Column Editorial Gateway Panels */}
-      <main id="main-content" className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 h-full">
-          {GATEWAY_PANELS.map((panel) => {
-            const theme = STOREFRONT_THEMES[panel.slug];
-            return (
-              <Link
-                key={panel.slug}
-                href={`/${panel.slug}`}
-                data-storefront={panel.slug}
-                className={`group relative flex flex-col justify-between rounded-xl p-8 bg-surface border transition-all duration-200 shadow-subtle ${panel.borderColor} ${panel.accentBg} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`}
-              >
-                {/* Top Badge & Age Info */}
-                <div>
-                  <div className="flex items-center justify-between mb-8">
-                    <span
-                      className="px-3 py-1 rounded-full text-xs font-sans font-semibold text-white tracking-wide"
-                      style={{ backgroundColor: theme.primaryAccent }}
+      {/* Main Storefront Cards Area */}
+      <main
+        id="main-content"
+        className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-6 py-3 sm:py-4 lg:pt-[14px] lg:pb-5 flex flex-col justify-center lg:justify-start items-center min-h-0"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-[22px] items-stretch w-full md:w-[calc(100%-24px)] mx-auto my-auto lg:my-0">
+          {GATEWAY_CARDS.map((card) => (
+            <Link
+              key={card.slug}
+              href={card.link}
+              prefetch={false}
+              data-storefront={card.slug}
+              className="group relative flex flex-col rounded-[24px] sm:rounded-[28px] overflow-hidden bg-white shadow-subtle hover:shadow-hover border border-brand-border/60 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 h-auto md:h-[490px] lg:h-[515px] xl:h-[535px]"
+            >
+              {/* Upper Image Section (~64%) */}
+              <div className="relative w-full aspect-[4/5] sm:aspect-[3/4] md:aspect-auto md:h-[64%] overflow-hidden bg-brand-surface-soft shrink-0">
+                <Image
+                  src={card.image}
+                  alt={card.imageAlt}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 400px"
+                  priority
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                  style={{ objectPosition: card.objectPosition }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              {/* Distinctive Curved / Arched Lower Panel (~38%) */}
+              <div className="relative -mt-5 sm:-mt-5.5 z-10 flex flex-col flex-1">
+                {/* SVG Arch curve transition */}
+                <div className="w-full overflow-hidden leading-none -mb-[1px]">
+                  <svg
+                    viewBox="0 0 320 22"
+                    fill="none"
+                    preserveAspectRatio="none"
+                    className="w-full h-5 sm:h-5.5 block"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M0,22 C80,2 240,2 320,22 L320,22 L0,22 Z"
+                      fill={card.panelBg}
+                    />
+                  </svg>
+                </div>
+
+                {/* Panel Body */}
+                <div
+                  className="flex-1 px-4 sm:px-5 pb-4 sm:pb-5 pt-0.5 flex flex-col items-center text-center justify-between"
+                  style={{ backgroundColor: card.panelBg }}
+                >
+                  <div className="flex flex-col items-center">
+                    {/* Decorative Icon */}
+                    <div className="mb-1 sm:mb-1.5">
+                      <StorefrontIdentityIcon
+                        storefront={card.slug}
+                        className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+                        style={{ color: card.accentColor }}
+                      />
+                    </div>
+
+                    {/* Storefront Title */}
+                    <h2 className="font-editorial text-xl sm:text-[22px] lg:text-2xl text-brand-ink font-normal tracking-tight">
+                      {card.title}
+                    </h2>
+
+                    {/* Age Range */}
+                    <p
+                      className="font-sans text-[10px] sm:text-[11px] uppercase tracking-widest font-semibold mt-0.5"
+                      style={{ color: card.accentColor }}
                     >
-                      {theme.ageRange}
-                    </span>
-                    <span className="h-8 w-8 rounded-full border border-border flex items-center justify-center text-text-muted group-hover:text-ink transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                    </span>
+                      {card.age}
+                    </p>
+
+                    {/* Description */}
+                    <p className="font-sans text-[11.5px] sm:text-xs text-brand-text/90 mt-1 leading-snug max-w-[240px]">
+                      {card.description}
+                    </p>
+                    <span className="sr-only">{card.srDescription}</span>
                   </div>
 
-                  {/* Title & Subtitle */}
-                  <h2 className="font-editorial text-2xl sm:text-3xl text-ink group-hover:text-ink/90 font-normal">
-                    {theme.name}
-                  </h2>
-                  <p className="font-sans text-xs uppercase tracking-wider text-text-muted mt-1 font-medium">
-                    {panel.subtitle}
-                  </p>
-
-                  {/* Description */}
-                  <p className="font-sans text-sm text-text-base/80 mt-4 leading-relaxed">
-                    {panel.description}
-                  </p>
-                </div>
-
-                {/* Bottom Call to Action */}
-                <div className="pt-8 border-t border-border/60 mt-8">
-                  <div className="inline-flex items-center gap-2 font-sans text-sm font-semibold text-ink group-hover:underline">
-                    <span>Explore {theme.name}</span>
-                    <span aria-hidden="true">&rarr;</span>
+                  {/* CTA Button */}
+                  <div className="w-full mt-3 sm:mt-4">
+                    <span
+                      className="w-full min-h-[44px] md:min-h-[38px] inline-flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full font-sans text-xs font-semibold tracking-wide text-white transition-all duration-200 shadow-sm group-hover:shadow-md group-hover:brightness-105 active:scale-[0.99]"
+                      style={{ backgroundColor: card.accentColor }}
+                    >
+                      <span>{card.cta}</span>
+                      <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
+                    </span>
                   </div>
                 </div>
-              </Link>
-            );
-          })}
+              </div>
+            </Link>
+          ))}
         </div>
       </main>
 
-      {/* Gateway Trust Footer */}
-      <footer className="py-8 px-4 text-center border-t border-border/50 bg-surface/50 mt-12">
-        <p className="font-sans text-xs text-text-muted">
-          Pakistan-Wide Delivery &bull; Delivery Within 10 Days &bull; Cash on Delivery & Manual
-          Bank Transfer
-        </p>
-      </footer>
     </div>
   );
 }

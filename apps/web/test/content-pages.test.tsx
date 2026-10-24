@@ -43,6 +43,10 @@ function readPageSource(relPath: string): string {
   return fs.readFileSync(fullPath, "utf8");
 }
 
+function renderSharedPageContent(element: React.ReactElement): string {
+  return renderToStaticMarkup((element.props as { children: React.ReactNode }).children);
+}
+
 async function runAllTests(): Promise<void> {
   console.log("\n=======================================================");
   console.log("Kids Wear — Work Unit 20: Content & Policy Pages Test Suite");
@@ -128,7 +132,7 @@ async function runAllTests(): Promise<void> {
 
   const aboutSource = readPageSource("about/page.tsx");
   const aboutElement = await AboutPage();
-  const aboutHtml = renderToStaticMarkup(aboutElement);
+  const aboutHtml = renderSharedPageContent(aboutElement);
 
   await runTest("8. Kids Wear identity and location rendered without unconfirmed claims", () => {
     assert(aboutHtml.includes("Kids Wear"), "Must include brand name");
@@ -183,7 +187,7 @@ async function runAllTests(): Promise<void> {
 
   const contactSource = readPageSource("contact/page.tsx");
   const contactElement = await ContactPage();
-  const contactHtml = renderToStaticMarkup(contactElement);
+  const contactHtml = renderSharedPageContent(contactElement);
 
   await runTest("11. correct address rendered neutrally rather than Physical Studio", () => {
     assert(contactHtml.includes("Street-05"), "Must include Street-05");
@@ -253,7 +257,7 @@ async function runAllTests(): Promise<void> {
 
   const shippingSource = readPageSource("shipping-policy/page.tsx");
   const shippingElement = await ShippingPolicyPage();
-  const shippingHtml = renderToStaticMarkup(shippingElement);
+  const shippingHtml = renderSharedPageContent(shippingElement);
 
   await runTest("18. Pakistan-wide delivery wording present", () => {
     assert(
@@ -349,7 +353,7 @@ async function runAllTests(): Promise<void> {
 
   const returnSource = readPageSource("return-exchange-policy/page.tsx");
   const returnElement = await ReturnExchangePolicyPage();
-  const returnHtml = renderToStaticMarkup(returnElement);
+  const returnHtml = renderSharedPageContent(returnElement);
 
   await runTest("25. page does not invent return window", () => {
     assert(!returnSource.toLowerCase().includes("7-day"), "No 7-day return window");
@@ -404,7 +408,7 @@ async function runAllTests(): Promise<void> {
 
   const privacySource = readPageSource("privacy-policy/page.tsx");
   const privacyElement = await PrivacyPolicyPage();
-  const privacyHtml = renderToStaticMarkup(privacyElement);
+  const privacyHtml = renderSharedPageContent(privacyElement);
 
   await runTest(
     "29. no absolute 'never share' claim; accurately lists infrastructure providers",
@@ -519,7 +523,7 @@ async function runAllTests(): Promise<void> {
 
   const termsSource = readPageSource("terms/page.tsx");
   const termsElement = await TermsPage();
-  const termsHtml = renderToStaticMarkup(termsElement);
+  const termsHtml = renderSharedPageContent(termsElement);
 
   await runTest("36. Cash on Delivery (COD) represented", () => {
     assert(termsHtml.includes("Cash on Delivery"), "Must describe COD");

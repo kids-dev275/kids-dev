@@ -8,6 +8,7 @@ import { CheckoutCustomerForm } from "../src/components/checkout/checkout-custom
 import { CheckoutPaymentSelection } from "../src/components/checkout/checkout-payment-selection";
 import { CheckoutOrderSummary } from "../src/components/checkout/checkout-order-summary";
 import { CheckoutReviewView } from "../src/components/checkout/checkout-review-view";
+import { CheckoutPrimaryAction } from "../src/components/checkout/checkout-primary-action";
 import {
   checkoutFormSchema,
   normalizeCheckoutFormData,
@@ -1092,6 +1093,92 @@ async function runSuite() {
       false,
       "Must not contain track your order"
     );
+  });
+
+  await runTest("59. Enabled Review Order uses a high-contrast storefront action", () => {
+    const markup = renderToStaticMarkup(
+      <CheckoutPrimaryAction type="submit">Review Order</CheckoutPrimaryAction>
+    );
+    const button = markup.match(/<button\b[^>]*>/)?.[0] ?? "";
+    assert.match(button, /type="submit"/);
+    assert.doesNotMatch(button, /\sdisabled(?:="")?(?:\s|>)/);
+    assert.match(button, /bg-\[var\(--color-storefront-contrast\)\]/);
+    assert.match(button, /text-white/);
+    assert.match(button, /opacity-100/);
+    assert.match(button, /enabled:hover:/);
+    assert.match(button, /enabled:active:/);
+    assert.match(button, /focus-visible:outline-/);
+    assert.match(checkoutViewSource, /<CheckoutPrimaryAction[\s\S]*?type="submit"/);
+    assert.doesNotMatch(checkoutViewSource, /Your card or bank is not charged/);
+    assert.match(checkoutViewSource, /You will review your order before confirming it/);
+  });
+
+  await runTest("60. Enabled Place Order shares the storefront action", () => {
+    const markup = renderToStaticMarkup(
+      <CheckoutReviewView
+        reviewedData={MOCK_REVIEWED_DATA}
+        bankConfig={MOCK_CONFIG.paymentMethods.bankTransfer}
+        onEditDetails={() => {}}
+        onPlaceOrder={() => {}}
+        isSubmittingOrder={false}
+      />
+    );
+    const button = markup.match(/<button\b[^>]*data-testid="place-order-button"[^>]*>/)?.[0] ?? "";
+    assert.match(button, /type="button"/);
+    assert.doesNotMatch(button, /\sdisabled(?:="")?(?:\s|>)/);
+    assert.match(button, /bg-\[var\(--color-storefront-contrast\)\]/);
+    assert.match(button, /text-white/);
+    assert.match(markup, />Place Order</);
+  });
+
+  await runTest("61. Disabled checkout actions remain distinct and readable", () => {
+    const review = renderToStaticMarkup(
+      <CheckoutPrimaryAction type="submit" disabled>Verifying with server...</CheckoutPrimaryAction>
+    );
+    const place = renderToStaticMarkup(
+      <CheckoutReviewView
+        reviewedData={MOCK_REVIEWED_DATA}
+        bankConfig={MOCK_CONFIG.paymentMethods.bankTransfer}
+        onEditDetails={() => {}}
+        onPlaceOrder={() => {}}
+        isSubmittingOrder={true}
+      />
+    );
+    for (const button of [
+      review.match(/<button\b[^>]*>/)?.[0] ?? "",
+      place.match(/<button\b[^>]*data-testid="place-order-button"[^>]*>/)?.[0] ?? "",
+    ]) {
+      assert.match(button, /disabled=""/);
+      assert.match(button, /disabled:bg-surface-soft/);
+      assert.match(button, /disabled:text-text-muted/);
+      assert.match(button, /disabled:opacity-100/);
+      assert.match(button, /disabled:cursor-not-allowed/);
+    }
+  });
+
+  await runTest("62. Enabled and disabled CTA colors meet AA text contrast", () => {
+    const css = fs.readFileSync(path.join(webSrc, "app/globals.css"), "utf-8");
+    const luminance = (hex: string) => {
+      const channels = [1, 3, 5].map((start) => {
+        const channel = parseInt(hex.slice(start, start + 2), 16) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+    for (const storefront of ["mini-sprouts", "teen-studio", "aura-studio"]) {
+      const block = css.match(new RegExp(`\\[data-storefront="${storefront}"\\][\\s\\S]*?\\{([^}]*)\\}`))?.[1];
+      const color = block?.match(/--color-storefront-contrast:\s*(#[0-9a-f]{6})/i)?.[1];
+      assert(color, `${storefront} needs a contrast token`);
+      const ratio = 1.05 / (luminance(color) + 0.05);
+      assert(ratio >= 4.5, `${storefront} white text contrast is ${ratio.toFixed(2)}:1`);
+    }
+    const disabledBackground = css.match(/--color-surface-soft:\s*(#[0-9a-f]{6})/i)?.[1];
+    const disabledText = css.match(/--color-text-muted:\s*(#[0-9a-f]{6})/i)?.[1];
+    assert(disabledBackground && disabledText, "Disabled CTA color tokens must exist");
+    const lighter = Math.max(luminance(disabledBackground), luminance(disabledText));
+    const darker = Math.min(luminance(disabledBackground), luminance(disabledText));
+    const disabledRatio = (lighter + 0.05) / (darker + 0.05);
+    assert(disabledRatio >= 4.5, `Disabled CTA text contrast is ${disabledRatio.toFixed(2)}:1`);
   });
 
   // -------------------------------------------------------------------------

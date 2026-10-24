@@ -1,14 +1,14 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { StorefrontShell } from "@/components/shell/storefront-shell";
+import { SharedStorefrontShell } from "@/components/shell/storefront-shell";
 import { PolicyContainer } from "@/components/layout/policy-container";
 import { fetchPublicSettings } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Kids Wear Operational Terms",
+  title: "Terms & Conditions — Kids Wear",
   description:
     "Terms of service governing use of Kids Wear, our age storefronts, ordering, and customer responsibilities.",
   alternates: {
@@ -20,10 +20,10 @@ export default async function TermsPage() {
   const settings = await fetchPublicSettings();
 
   return (
-    <StorefrontShell storefront="mini-sprouts" announcement={settings?.announcement}>
+    <SharedStorefrontShell announcement={settings?.announcement}>
       <PolicyContainer
         badge="Platform Terms"
-        title="Terms of Service"
+        title="Terms & Conditions"
         description="These operational terms govern your access to and use of Kids Wear, our three age-based storefronts, and our order fulfillment services."
         lastUpdated="Effective for Kids Wear V1 Platform"
       >
@@ -193,6 +193,6 @@ export default async function TermsPage() {
           </address>
         </section>
       </PolicyContainer>
-    </StorefrontShell>
+    </SharedStorefrontShell>
   );
 }

@@ -91,10 +91,21 @@ export const adminProductRoutes: FastifyPluginAsync = async (
             slug: true,
           },
         },
+        media: {
+          where: { isMain: true },
+          take: 1,
+          select: { mediaAsset: { select: { secureUrl: true } } },
+        },
+        variants: { select: { isAvailable: true } },
       },
     });
 
-    const formattedItems = items.map(formatProduct);
+    const formattedItems = items.map(({ media, variants, ...product }) => ({
+      ...formatProduct(product),
+      thumbnailUrl: media[0]?.mediaAsset.secureUrl ?? null,
+      variantCount: variants.length,
+      availableVariantCount: variants.filter((variant) => variant.isAvailable).length,
+    }));
 
     reply.status(200).send({
       success: true,

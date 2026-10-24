@@ -236,6 +236,8 @@ async function runSuite(): Promise<void> {
     assert(headerStr.includes("HttpOnly"), "HttpOnly flag missing");
     assert(headerStr.includes("Path=/"), "Path=/ missing");
     assert(headerStr.toLowerCase().includes("samesite=lax"), "SameSite=Lax missing");
+    assert(!/max-age=/i.test(headerStr), "Admin login cookie must not have Max-Age");
+    assert(!/expires=/i.test(headerStr), "Admin login cookie must not have Expires");
   });
 
   // 9. GET /admin/auth/me succeeds with valid session

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminReview, updateAdminReviewStatus, deleteAdminReview } from "@/lib/admin-api";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
 import type { AdminReviewDetailData, ReviewStatusType } from "@kids-wear/shared";
 import {
   ArrowLeft,
@@ -28,7 +29,7 @@ export default function AdminReviewDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
 
   const fetchReview = useCallback(async () => {
     if (!reviewId) return;
@@ -210,7 +211,7 @@ export default function AdminReviewDetailPage() {
 
           {successMessage && (
             <div
-              className="p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs"
+              className={`p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs transition-opacity duration-300 ${successFading ? "opacity-0" : "opacity-100"}`}
               role="status"
             >
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -272,7 +273,7 @@ export default function AdminReviewDetailPage() {
               </div>
               <Link
                 href={`/admin/products/${review.product.id}`}
-                className="px-2.5 py-1 text-xs uppercase tracking-wider font-semibold text-brand-primary border border-brand-sand rounded-sm hover:bg-brand-sand/40"
+                className="px-2.5 py-1 text-xs uppercase tracking-wider font-semibold text-brand-ink border border-brand-border rounded-sm hover:bg-brand-surface-soft transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
               >
                 Inspect Product
               </Link>

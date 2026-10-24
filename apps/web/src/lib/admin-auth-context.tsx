@@ -8,11 +8,12 @@ interface AdminAuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshAdmin: () => Promise<AdminUser | null>;
-  logout: () => Promise<void>;
+  logout: () => Promise<boolean>;
   setAdminDirect: (admin: AdminUser | null) => void;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefined);
+const ADMIN_TAB_MARKER = "kw_admin_tab_authenticated";
 
 export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
@@ -20,6 +21,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAdmin = useCallback(async (): Promise<AdminUser | null> => {
     setIsLoading(true);
+    if (sessionStorage.getItem(ADMIN_TAB_MARKER) !== "true") {
+      setAdmin(null);
+      setIsLoading(false);
+      return null;
+    }
     try {
       const res = await getAdminMe();
       if (res.success && res.data?.admin) {
@@ -27,11 +33,13 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return res.data.admin;
       } else {
+        sessionStorage.removeItem(ADMIN_TAB_MARKER);
         setAdmin(null);
         setIsLoading(false);
         return null;
       }
     } catch {
+      sessionStorage.removeItem(ADMIN_TAB_MARKER);
       setAdmin(null);
       setIsLoading(false);
       return null;
@@ -40,15 +48,22 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await adminLogout();
-    } catch {
-      // Always clear local in-memory state
-    } finally {
+      const res = await adminLogout();
+      if (!res.success) return false;
+      sessionStorage.removeItem(ADMIN_TAB_MARKER);
       setAdmin(null);
+      return true;
+    } catch {
+      return false;
     }
   }, []);
 
   const setAdminDirect = useCallback((user: AdminUser | null) => {
+    if (user) {
+      sessionStorage.setItem(ADMIN_TAB_MARKER, "true");
+    } else {
+      sessionStorage.removeItem(ADMIN_TAB_MARKER);
+    }
     setAdmin(user);
     setIsLoading(false);
   }, []);

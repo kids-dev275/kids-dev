@@ -60,6 +60,22 @@ export const publicCatalogRoutes: FastifyPluginAsync = async (
           regularPrice: true,
           compareAtPrice: true,
           isNewArrival: true,
+          sizes: {
+            where: { isActive: true },
+            select: { id: true, name: true, sortOrder: true },
+          },
+          colors: {
+            where: { isActive: true },
+            select: { id: true, name: true, sortOrder: true },
+          },
+          variants: {
+            where: {
+              isAvailable: true,
+              size: { isActive: true },
+              color: { isActive: true },
+            },
+            select: { id: true, productSizeId: true, productColorId: true },
+          },
           media: {
             where: {
               OR: [{ isMain: true }, { isHover: true }],
@@ -147,6 +163,22 @@ export const publicCatalogRoutes: FastifyPluginAsync = async (
           regularPrice: true,
           compareAtPrice: true,
           isNewArrival: true,
+          sizes: {
+            where: { isActive: true },
+            select: { id: true, name: true, sortOrder: true },
+          },
+          colors: {
+            where: { isActive: true },
+            select: { id: true, name: true, sortOrder: true },
+          },
+          variants: {
+            where: {
+              isAvailable: true,
+              size: { isActive: true },
+              color: { isActive: true },
+            },
+            select: { id: true, productSizeId: true, productColorId: true },
+          },
           media: {
             where: {
               OR: [{ isMain: true }, { isHover: true }],

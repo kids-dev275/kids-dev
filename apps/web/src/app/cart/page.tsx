@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import { fetchPublicSettings } from "@/lib/api";
-import { StorefrontShell } from "@/components/shell/storefront-shell";
+import { SharedStorefrontShell } from "@/components/shell/storefront-shell";
 import { CartView } from "@/components/cart/cart-view";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +20,8 @@ export default async function CartPage() {
   const settings = await fetchPublicSettings();
 
   return (
-    <StorefrontShell storefront="mini-sprouts" announcement={settings?.announcement}>
+    <SharedStorefrontShell announcement={settings?.announcement}>
       <CartView />
-    </StorefrontShell>
+    </SharedStorefrontShell>
   );
 }

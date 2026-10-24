@@ -491,6 +491,34 @@ async function runSuite() {
     assert.match(html, /Please remove unavailable items before proceeding to checkout/);
   });
 
+  await runTest("33a. empty cart cannot proceed while a validated item links to checkout", () => {
+    const empty = renderToStaticMarkup(
+      <CartSummary
+        subtotal="0.00"
+        deliveryCharge="0.00"
+        total="0.00"
+        hasInvalidItems={false}
+        isValidating={false}
+        itemCount={0}
+      />
+    );
+    assert(!empty.includes('href="/checkout"'), "Empty cart cannot navigate to checkout");
+    const valid = renderToStaticMarkup(
+      <CartSummary
+        subtotal="2950.00"
+        deliveryCharge="300.00"
+        total="3250.00"
+        hasInvalidItems={false}
+        isValidating={false}
+        itemCount={1}
+      />
+    );
+    assert(valid.includes('href="/checkout"'), "Validated cart routes to existing checkout");
+    assert(valid.includes("bg-[var(--color-storefront-contrast)]"), "CTA uses storefront contrast");
+    assert(valid.includes("font-sans") && valid.includes("tabular-nums"), "Totals use Montserrat numerals");
+    assert(!valid.includes("font-editorial text-2xl"), "Grand total is not decorative serif");
+  });
+
   // =========================================================================
   // 6. CART VALIDATION API CONTRACT & DEFENSIVE SCOPE (Tests 34–53)
   // =========================================================================

@@ -17,6 +17,12 @@ export interface CloudinaryResourceMetadata {
 export interface UploadSignatureParams {
   productId: string;
   mediaType: "IMAGE" | "VIDEO";
+  videoCrop?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface UploadSignatureResult {
@@ -27,6 +33,7 @@ export interface UploadSignatureResult {
   resourceType: "image" | "video";
   folder: string;
   publicId: string;
+  transformation?: string;
 }
 
 export interface ReviewUploadSignatureParams {
@@ -88,6 +95,10 @@ export class DefaultCloudinaryService implements ICloudinaryService {
     const fileId = crypto.randomUUID();
     const publicId = `${folder}/${fileId}`;
     const resourceType: "image" | "video" = params.mediaType === "IMAGE" ? "image" : "video";
+    const crop = params.videoCrop;
+    const transformation = crop
+      ? `c_crop,h_${crop.height},w_${crop.width},x_${crop.x},y_${crop.y}/c_scale,f_mp4,h_1350,w_1080`
+      : undefined;
 
     const apiSecret = env.CLOUDINARY_API_SECRET || "development-api-secret";
     const apiKey = env.CLOUDINARY_API_KEY || "development-api-key";
@@ -98,6 +109,7 @@ export class DefaultCloudinaryService implements ICloudinaryService {
       folder,
       public_id: publicId,
       timestamp,
+      ...(transformation && { transformation }),
     };
 
     const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
@@ -110,6 +122,7 @@ export class DefaultCloudinaryService implements ICloudinaryService {
       resourceType,
       folder,
       publicId,
+      ...(transformation && { transformation }),
     };
   }
 

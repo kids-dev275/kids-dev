@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import { getOptimizedMediaUrl } from "@kids-wear/shared";
@@ -14,6 +13,21 @@ export interface HeroSliderProps {
   className?: string;
 }
 
+const FALLBACK_COPY = {
+  "mini-sprouts": {
+    eyebrow: "STYLE FOR LITTLE MOMENTS",
+    text: "Playful styles for everyday moments and special days.",
+  },
+  "teen-studio": {
+    eyebrow: "STYLE FOR EVERY MOOD",
+    text: "Fresh, expressive styles designed for growing personalities.",
+  },
+  "aura-studio": {
+    eyebrow: "REFINED EVERYDAY STYLE",
+    text: "Modern silhouettes and versatile styles for every chapter.",
+  },
+} as const;
+
 /**
  * HeroSlider renders storefront-specific hero imagery and messaging.
  * Supports distinct desktop and mobile source imagery, manual keyboard-accessible
@@ -21,7 +35,30 @@ export interface HeroSliderProps {
  */
 export function HeroSlider({ slides = [], storefront, className = "" }: HeroSliderProps) {
   const currentTheme = STOREFRONT_THEMES[storefront];
-  const activeSlides = (slides || []).filter((s) => s.isActive);
+  const configuredSlides = (slides || [])
+    .filter((s) => s.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const usingFallback = process.env.NODE_ENV !== "production" && (!slides || slides.length === 0);
+  const activeSlides: ApiHeroSlide[] = usingFallback
+    ? [1, 2, 3].map((number) => ({
+        id: `${storefront}-local-${number}`,
+        storefrontId: storefront,
+        heading: currentTheme.name,
+        text: FALLBACK_COPY[storefront].text,
+        ctaLabel: `Shop ${currentTheme.name}`,
+        ctaLink: `/${storefront}/shop`,
+        sortOrder: number,
+        isActive: true,
+        desktopImageAsset: {
+          id: `${storefront}-${number}`,
+          secureUrl: `/images/hero/${storefront}/${storefront}-hero-0${number}-desktop.webp`,
+          width: 1672,
+          height: 941,
+          format: "webp",
+        },
+        mobileImageAsset: null,
+      }))
+    : configuredSlides;
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const total = activeSlides.length;
@@ -50,42 +87,11 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [total, goToPrevious, goToNext]);
 
-  // Restrained fallback when no active slides exist
   if (total === 0) {
-    return (
-      <section
-        aria-label={`${currentTheme.name} Welcome`}
-        className={`relative w-full bg-surface-soft border-b border-border py-16 sm:py-24 px-4 sm:px-6 lg:px-8 text-center ${className}`.trim()}
-      >
-        <div className="max-w-3xl mx-auto space-y-4">
-          <span
-            className="inline-block px-3 py-1 rounded-full text-xs font-sans font-semibold text-white tracking-wide"
-            style={{ backgroundColor: currentTheme.primaryAccent }}
-          >
-            {currentTheme.ageRange}
-          </span>
-          <h1 className="font-editorial text-3xl sm:text-4xl lg:text-5xl text-ink font-normal tracking-tight">
-            Welcome to {currentTheme.name}
-          </h1>
-          <p className="font-sans text-sm sm:text-base text-text-base/80 max-w-xl mx-auto leading-relaxed">
-            Explore Kids Wear apparel for {currentTheme.ageRange}, delivered across Pakistan within
-            10 days.
-          </p>
-          <div className="pt-4">
-            <Link
-              href={`/${storefront}/shop`}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-sans font-semibold text-white bg-accent-storefront hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-storefront shadow-subtle"
-            >
-              <span>Explore {currentTheme.name}</span>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
-    );
+    return null;
   }
 
-  const slide = activeSlides[currentIndex];
+  const slide = activeSlides[currentIndex] || activeSlides[0];
   const hasMultiple = total > 1;
 
   const desktopImage = slide.desktopImageAsset?.secureUrl;
@@ -98,7 +104,7 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
       className={`relative w-full overflow-hidden bg-ink/5 border-b border-border ${className}`.trim()}
     >
       {/* Slide Visual Container */}
-      <div className="relative w-full min-h-[460px] sm:min-h-[520px] lg:min-h-[580px] flex items-center">
+      <div className="relative flex min-h-[560px] w-full items-end sm:min-h-[480px] sm:items-center lg:min-h-[480px]">
         {/* Single Responsive Picture Element to prevent dual-image preloads */}
         {(desktopImage || mobileImage) && (
           <div className="absolute inset-0 w-full h-full">
@@ -124,42 +130,56 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
                 />
               )}
               <img
+                key={slide.id}
                 src={getOptimizedMediaUrl(desktopImage || mobileImage, {
                   width: 1920,
                   height: 800,
                   crop: "fill",
                 })}
                 alt={slide.heading || `${currentTheme.name} Hero`}
-                className="w-full h-full object-cover object-center"
+                className={`w-full h-full object-cover animate-[storefront-hero-in_350ms_ease-out] ${usingFallback ? "object-[70%_top] md:object-top" : "object-center"}`}
                 loading={currentIndex === 0 ? "eager" : "lazy"}
                 fetchPriority={currentIndex === 0 ? "high" : "low"}
               />
             </picture>
             {/* Subtle Gradient Overlay for Content Legibility */}
-            <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-ink/70 via-ink/40 to-transparent" />
+            <div
+              className={`hidden md:block absolute inset-0 ${usingFallback ? "bg-gradient-to-r from-[#FBF7F2]/95 via-[#FBF7F2]/65 to-transparent" : "bg-gradient-to-r from-ink/70 via-ink/40 to-transparent"}`}
+            />
             {/* Darker Mobile Overlay for Vertical Text Contrast */}
-            <div className="block md:hidden absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/40 to-ink/20" />
+            <div
+              className={`block md:hidden absolute inset-0 ${usingFallback ? "bg-gradient-to-t from-[#FBF7F2] via-[#FBF7F2]/95 via-35% to-transparent" : "bg-gradient-to-t from-ink/80 via-ink/40 to-ink/20"}`}
+            />
           </div>
         )}
 
         {/* Text & CTA Content Box */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-          <div className="max-w-xl text-white space-y-4">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 pt-56 sm:py-12 w-full">
+          <div className={`max-w-xl space-y-4 ${usingFallback ? "text-ink" : "text-white"}`}>
+            {usingFallback && (
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--color-storefront-contrast)]">
+                {FALLBACK_COPY[storefront].eyebrow}
+              </p>
+            )}
             <span
-              className="inline-block px-3 py-1 rounded-full text-xs font-sans font-semibold text-white tracking-wide shadow-xs"
-              style={{ backgroundColor: currentTheme.primaryAccent }}
+              className={`inline-block text-xs font-sans font-semibold uppercase tracking-widest ${usingFallback ? "text-[var(--color-storefront-contrast)]" : "rounded-full px-3 py-1 text-white"}`}
+              style={!usingFallback ? { backgroundColor: currentTheme.primaryAccent } : undefined}
             >
-              {currentTheme.name} &bull; {currentTheme.ageRange}
+              {currentTheme.ageRange}
             </span>
 
             {slide.heading && (
-              <h1 className="font-editorial text-3xl sm:text-4xl lg:text-5xl font-normal leading-tight text-white drop-shadow-xs">
+              <h1
+                className={`font-editorial text-4xl sm:text-5xl lg:text-6xl font-normal leading-tight ${usingFallback ? "text-ink" : "text-white"}`}
+              >
                 {slide.heading}
               </h1>
             )}
 
             {slide.text && (
-              <p className="font-sans text-sm sm:text-base text-white/90 leading-relaxed max-w-lg drop-shadow-xs">
+              <p
+                className={`font-sans text-sm sm:text-base leading-relaxed max-w-lg ${usingFallback ? "text-text-base" : "text-white/90"}`}
+              >
                 {slide.text}
               </p>
             )}
@@ -168,7 +188,7 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
               <div className="pt-2">
                 <Link
                   href={slide.ctaLink}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-sans font-semibold text-white bg-accent-storefront hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white shadow-subtle"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-sans font-semibold text-white bg-[var(--color-storefront-contrast)] hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white shadow-subtle"
                 >
                   <span>{slide.ctaLabel}</span>
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />

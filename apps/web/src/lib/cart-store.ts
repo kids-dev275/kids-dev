@@ -134,6 +134,13 @@ export function sanitizePersistedCartItems(rawItems: unknown): CartItem[] {
   return Array.from(normalizedMap.values()).slice(0, MAX_CART_ITEMS);
 }
 
+export function getCartTotalUnits(items: readonly CartItem[]): number {
+  return items.reduce(
+    (sum, item) => sum + (Number.isInteger(item.quantity) ? item.quantity : 0),
+    0
+  );
+}
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
@@ -252,6 +259,14 @@ export const useCartStore = create<CartState>()(
     {
       name: CART_STORAGE_KEY,
       version: CART_STORAGE_VERSION,
+      // Hydrate after the store exists: the completion callback needs useCartStore.
+      skipHydration: true,
+      partialize: (state) => ({ items: state.items }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<CartState>),
+        isHydrated: false,
+      }),
       storage: createJSONStorage(() => {
         if (typeof window !== "undefined") {
           return {
@@ -299,7 +314,8 @@ export const useCartStore = create<CartState>()(
       },
       onRehydrateStorage: () => (state, error) => {
         if (error || !state) {
-          useCartStore.setState({ items: [], isHydrated: true });
+          // A storage read error must not discard items already in memory.
+          useCartStore.setState({ isHydrated: true });
           return;
         }
         // Sanitize items upon rehydration from storage (discards malformed lines, merges duplicate variant IDs <= 10)
@@ -309,6 +325,10 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+
+if (typeof window !== "undefined") {
+  void useCartStore.persist.rehydrate();
+}
 
 const emptySubscribe = () => () => {};
 
@@ -324,13 +344,8 @@ export function useCart() {
   );
   const store = useCartStore();
 
-  const isHydrated = isMounted && (store.isHydrated || true);
-  const totalUnits = isHydrated
-    ? store.items.reduce(
-        (sum, item) => sum + (Number.isInteger(item.quantity) ? item.quantity : 0),
-        0
-      )
-    : 0;
+  const isHydrated = isMounted && store.isHydrated;
+  const totalUnits = isHydrated ? getCartTotalUnits(store.items) : 0;
 
   return {
     ...store,

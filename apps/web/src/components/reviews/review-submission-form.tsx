@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Star, Upload, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormField, FieldLabel, FieldError } from "@/components/ui/form";
@@ -18,6 +18,7 @@ export interface ReviewProductOption {
 export interface ReviewSubmissionFormProps {
   products: ReviewProductOption[];
   preselectedProductId?: string;
+  preselectedProductName?: string;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ interface SelectedFile {
 export function ReviewSubmissionForm({
   products,
   preselectedProductId,
+  preselectedProductName,
   className = "",
 }: ReviewSubmissionFormProps) {
   const [name, setName] = useState("");
@@ -40,13 +42,14 @@ export function ReviewSubmissionForm({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const previewUrls = useRef<Set<string>>(new Set());
 
-  // Clean up object URLs on unmount
   useEffect(() => {
+    const urls = previewUrls.current;
     return () => {
-      selectedFiles.forEach((sf) => URL.revokeObjectURL(sf.previewUrl));
+      urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [selectedFiles]);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -69,10 +72,11 @@ export function ReviewSubmissionForm({
     }
 
     setErrorMessage(null);
-    const newSelected: SelectedFile[] = validFiles.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
+    const newSelected: SelectedFile[] = validFiles.map((file) => {
+      const previewUrl = URL.createObjectURL(file);
+      previewUrls.current.add(previewUrl);
+      return { file, previewUrl };
+    });
 
     setSelectedFiles((prev) => [...prev, ...newSelected]);
     e.target.value = "";
@@ -83,6 +87,7 @@ export function ReviewSubmissionForm({
       const removed = prev[index];
       if (removed) {
         URL.revokeObjectURL(removed.previewUrl);
+        previewUrls.current.delete(removed.previewUrl);
       }
       return prev.filter((_, i) => i !== index);
     });
@@ -194,6 +199,10 @@ export function ReviewSubmissionForm({
       setSuccessMessage("Your review has been submitted for approval.");
       setName("");
       setReviewText("");
+      selectedFiles.forEach((item) => {
+        URL.revokeObjectURL(item.previewUrl);
+        previewUrls.current.delete(item.previewUrl);
+      });
       setSelectedFiles([]);
       if (!preselectedProductId) {
         setProductId("");
@@ -273,34 +282,43 @@ export function ReviewSubmissionForm({
             {clientErrors.name && <FieldError>{clientErrors.name}</FieldError>}
           </FormField>
 
-          {/* Product Selection */}
-          <FormField isInvalid={!!clientErrors.productId} isRequired>
-            <FieldLabel htmlFor="review-product">Product</FieldLabel>
-            <select
-              id="review-product"
-              required
-              value={productId}
-              onChange={(e) => {
-                setProductId(e.target.value);
-                if (clientErrors.productId) setClientErrors((prev) => ({ ...prev, productId: "" }));
-              }}
-              disabled={isSubmitting || !!preselectedProductId}
-              className={`w-full rounded-md border bg-surface px-3 py-2.5 text-sm font-sans text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-accent-storefront ${
-                clientErrors.productId ? "border-rose-500" : "border-border"
-              }`}
-            >
-              <option value="">-- Choose a Product --</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            {clientErrors.productId && <FieldError>{clientErrors.productId}</FieldError>}
-          </FormField>
+          {/* PDP reviews are bound to the current product; the community page retains its picker. */}
+          {preselectedProductId ? (
+            <div className="rounded-md border border-border bg-surface-soft px-3.5 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Product</p>
+              <p className="mt-1 text-sm font-medium text-ink">{preselectedProductName}</p>
+            </div>
+          ) : (
+            <FormField isInvalid={!!clientErrors.productId} isRequired>
+              <FieldLabel htmlFor="review-product">Product</FieldLabel>
+              <select
+                id="review-product"
+                required
+                value={productId}
+                onChange={(e) => {
+                  setProductId(e.target.value);
+                  if (clientErrors.productId) setClientErrors((prev) => ({ ...prev, productId: "" }));
+                }}
+                disabled={isSubmitting}
+                aria-invalid={!!clientErrors.productId || undefined}
+                aria-describedby={clientErrors.productId ? "review-product-error" : undefined}
+                className={`w-full rounded-md border bg-surface px-3 py-2.5 text-sm font-sans text-ink transition-colors focus:outline-none focus:ring-1 focus:ring-accent-storefront ${
+                  clientErrors.productId ? "border-rose-500" : "border-border"
+                }`}
+              >
+                <option value="">-- Choose a Product --</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              {clientErrors.productId && <FieldError id="review-product-error">{clientErrors.productId}</FieldError>}
+            </FormField>
+          )}
 
           {/* Star Rating Group */}
-          <fieldset className="space-y-1.5">
+          <fieldset className="space-y-1.5" aria-describedby={clientErrors.rating ? "review-rating-error" : undefined}>
             <legend className="block font-sans text-xs font-semibold uppercase tracking-wider text-text-base">
               Rating *
             </legend>
@@ -344,7 +362,7 @@ export function ReviewSubmissionForm({
               </span>
             </div>
             {clientErrors.rating && (
-              <p className="font-sans text-xs text-rose-600">{clientErrors.rating}</p>
+              <p id="review-rating-error" role="alert" className="font-sans text-xs text-rose-600">{clientErrors.rating}</p>
             )}
           </fieldset>
 
@@ -373,7 +391,7 @@ export function ReviewSubmissionForm({
               Photos (Optional, Maximum 3)
             </label>
             <p className="font-sans text-xs text-text-muted">
-              Add JPEG, PNG, or WebP images of your child wearing the item.
+              Add JPEG, PNG, or WebP images of the product.
             </p>
 
             {selectedFiles.length < 3 && (

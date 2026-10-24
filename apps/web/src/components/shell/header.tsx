@@ -1,91 +1,105 @@
-import React from "react";
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
-import { Search, User, ShoppingBag } from "lucide-react";
-import { STOREFRONT_THEMES, StorefrontSlug } from "@/components/theme/storefront-tokens";
+import { usePathname } from "next/navigation";
+import { Search, ShoppingBag, User } from "lucide-react";
+import { STOREFRONT_THEMES, type StorefrontSlug } from "@/components/theme/storefront-tokens";
+import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
+import { CartUnitBadge } from "@/components/cart/cart-badge";
 import { StorefrontSwitcher } from "./storefront-switcher";
 import { MobileNav } from "./mobile-nav";
-import { NavLink } from "../ui/navigation";
-import { CartUnitBadge } from "@/components/cart/cart-badge";
 
-export interface HeaderProps {
-  storefront: StorefrontSlug;
-  className?: string;
-}
-
-/**
- * Shared responsive customer Header.
- * Displays master brand identity, storefront switcher, storefront-scoped navigation,
- * action utilities (Search, Account, Cart placeholder), and accessible mobile navigation.
- */
-export function Header({ storefront, className = "" }: HeaderProps) {
-  const currentTheme = STOREFRONT_THEMES[storefront];
+export function Header({ storefront }: { storefront: StorefrontSlug }) {
+  const theme = STOREFRONT_THEMES[storefront];
+  const pathname = usePathname();
+  const nav = [
+    { label: "Home", href: `/${storefront}`, active: pathname === `/${storefront}` },
+    { label: "Shop", href: `/${storefront}/shop`, active: pathname === `/${storefront}/shop` },
+    {
+      label: "New Arrivals",
+      href: `/${storefront}/new-arrivals`,
+      active: pathname === `/${storefront}/new-arrivals`,
+    },
+    { label: "Reviews", href: `/${storefront}#reviews`, active: pathname === "/reviews" },
+    { label: "Contact", href: `/${storefront}#contact`, active: pathname === "/contact" },
+  ];
 
   return (
-    <header
-      className={`sticky top-0 z-40 w-full border-b border-border bg-surface/95 backdrop-blur-md transition-colors ${className}`.trim()}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-18 items-center justify-between gap-4">
-          {/* Left: Brand Identity & Current Storefront Marker */}
-          <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur-md">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-20 items-center justify-between gap-3 py-2 max-[419px]:flex-wrap max-[419px]:gap-y-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] lg:gap-4">
+          <div className="flex items-center gap-2 max-[419px]:w-full sm:gap-5 lg:gap-2 xl:gap-3">
             <Link
               href={`/${storefront}`}
-              className="group flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront rounded px-1"
+              prefetch={false}
+              className="flex items-start gap-1 leading-tight sm:gap-1.5 lg:gap-1 xl:gap-1.5"
             >
-              <span className="font-editorial text-2xl sm:text-3xl text-ink font-normal tracking-tight group-hover:text-accent-storefront transition-colors">
-                Kids Wear
-              </span>
-              <span className="font-sans text-[11px] font-semibold tracking-wider uppercase text-text-muted">
-                {currentTheme.name} &bull; {currentTheme.ageRange}
+              <StorefrontIdentityIcon
+                storefront={storefront}
+                className="mt-1 h-4 w-4 shrink-0 text-[var(--color-storefront-contrast)] lg:h-4 lg:w-4 xl:h-5 xl:w-5"
+              />
+              <span className="flex flex-col">
+                <span className="font-editorial text-xl text-[var(--color-storefront-contrast)] sm:text-3xl lg:whitespace-nowrap lg:text-xl xl:text-2xl">
+                  {theme.name}
+                </span>
+                <span className="whitespace-nowrap text-[9px] uppercase tracking-[0.1em] text-text-muted sm:text-[10px] sm:tracking-[0.2em]">
+                  {theme.ageRange}
+                </span>
               </span>
             </Link>
+            <span className="h-9 w-px bg-border" aria-hidden="true" />
+            <Link href="/" aria-label="Kids Wear gateway" className="shrink-0">
+              <Image
+                src="/brand/kids-wear-logo.webp"
+                alt="Kids Wear"
+                width={84}
+                height={55}
+                className="h-10 w-auto object-contain sm:h-12 lg:h-10 xl:h-12"
+              />
+            </Link>
           </div>
-
-          {/* Center: Desktop Navigation Links (Storefront Scoped) */}
-          <nav aria-label="Main Navigation" className="hidden lg:flex items-center gap-6">
-            <NavLink href={`/${storefront}`} exact>
-              Home
-            </NavLink>
-            <NavLink href={`/${storefront}/shop`}>Shop</NavLink>
-            <NavLink href={`/${storefront}/new-arrivals`}>New Arrivals</NavLink>
-            <NavLink href={`/${storefront}#reviews`}>Reviews</NavLink>
-            <NavLink href={`/${storefront}#contact`}>Contact</NavLink>
-          </nav>
-
-          {/* Right: Storefront Switcher, Utilities & Mobile Trigger */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Desktop Storefront Switcher */}
-            <div className="hidden md:block">
-              <StorefrontSwitcher currentStorefront={storefront} variant="compact" />
-            </div>
-
-            {/* Utility Icons */}
+          <div className="hidden flex-col items-center justify-center gap-1.5 lg:flex">
+            <StorefrontSwitcher currentStorefront={storefront} variant="compact" homepage />
+            <nav
+              aria-label="Main Navigation"
+              className="flex items-center justify-center gap-5 whitespace-nowrap text-sm font-medium text-ink xl:gap-7"
+            >
+              {nav.map(({ label, href, active }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`hover:text-[var(--color-storefront-contrast)] ${active ? "text-[var(--color-storefront-contrast)] underline underline-offset-4" : ""}`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="flex items-center gap-0 max-[419px]:w-full max-[419px]:justify-between sm:gap-2 lg:justify-self-end">
             <Link
               href={`/${storefront}/search`}
-              aria-label={`Search ${currentTheme.name}`}
-              className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center rounded-full text-text-base hover:text-accent-storefront hover:bg-surface-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+              aria-label={`Search ${theme.name}`}
+              className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft"
             >
               <Search className="h-5 w-5" aria-hidden="true" />
             </Link>
-
-            <Link
-              href="/account"
-              aria-label="Customer Account"
-              className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center rounded-full text-text-base hover:text-accent-storefront hover:bg-surface-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
-            >
-              <User className="h-5 w-5" aria-hidden="true" />
-            </Link>
-
             <Link
               href="/cart"
               aria-label="Shopping Cart"
-              className="relative min-h-[44px] min-w-[44px] p-2 flex items-center justify-center rounded-full text-text-base hover:text-accent-storefront hover:bg-surface-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft"
             >
               <ShoppingBag className="h-5 w-5" aria-hidden="true" />
               <CartUnitBadge />
             </Link>
-
-            {/* Mobile Navigation Trigger */}
+            <Link
+              href="/account"
+              aria-label="Customer Account"
+              className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft"
+            >
+              <User className="h-5 w-5" aria-hidden="true" />
+            </Link>
             <MobileNav storefront={storefront} />
           </div>
         </div>

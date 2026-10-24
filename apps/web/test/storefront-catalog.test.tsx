@@ -15,6 +15,22 @@ import { ProductMetadataSections } from "../src/components/pdp/product-metadata-
 import { Breadcrumbs } from "../src/components/pdp/breadcrumbs";
 import { Price } from "../src/components/commerce/price";
 import { ProductCard } from "../src/components/commerce/product-card";
+import {
+  addProductCardVariant,
+  availableQuickAddColors,
+  quickAddSizesForColor,
+  resolveQuickAddVariant,
+  retainQuickAddSize,
+} from "../src/lib/quick-add";
+import {
+  scheduleTransientFeedback,
+  shouldAutoDismiss,
+  browserClock,
+  TRANSIENT_FEEDBACK_DURATION_MS,
+  TRANSIENT_FEEDBACK_FADE_MS,
+  type FeedbackClock,
+} from "../src/lib/use-transient-feedback";
+import type { CartState } from "../src/lib/cart-store";
 import { EmptyState, NoResultsState, ErrorState } from "../src/components/commerce/system-states";
 import type {
   ApiProductCard,
@@ -99,6 +115,27 @@ async function runSuite() {
     isNewArrival: false,
     mainImage: { url: "/images/trousers-main.jpg", altText: null },
     hoverImage: null,
+  };
+
+  const quickAddCard: ApiProductCard = {
+    ...mockCard1,
+    id: "11111111-1111-4111-8111-111111111111",
+    quickAdd: {
+      colors: [
+        { id: "cream", name: "Cream" },
+        { id: "navy", name: "Navy" },
+        { id: "pink", name: "Pink" },
+      ],
+      sizes: [
+        { id: "2-3y", name: "2–3Y" },
+        { id: "4-5y", name: "4–5Y" },
+        { id: "6-7y", name: "6–7Y" },
+      ],
+      variants: [
+        { id: "22222222-2222-4222-8222-222222222222", productColorId: "cream", productSizeId: "2-3y" },
+        { id: "33333333-3333-4333-8333-333333333333", productColorId: "navy", productSizeId: "4-5y" },
+      ],
+    },
   };
 
   const mockMediaItems: ApiProductMediaItem[] = [
@@ -515,7 +552,7 @@ async function runSuite() {
     );
   });
 
-  await runTest("28. Product video uses controls, no autoplay, and no looping", () => {
+  await runTest("28. Product video uses custom controls, no autoplay, and no looping", () => {
     const videoMedia: ApiProductMediaItem[] = [
       {
         type: "VIDEO",
@@ -530,7 +567,11 @@ async function runSuite() {
       <ProductMediaGallery media={videoMedia} productName="Festive Kurta" />
     );
     assert(html.includes("<video"), "Must render video tag");
-    assert(html.includes("controls"), "Video must have native controls attribute");
+    assert(html.includes('aria-label="Seek video"'), "Video must have accessible scrubbing");
+    assert(html.includes('aria-label="Play video"'), "Video must have custom Play control");
+    assert(html.includes('aria-label="Unmute video"'), "Video must have custom mute control");
+    assert(html.includes('aria-label="Enter fullscreen"'), "Video must have fullscreen control");
+    assert(!html.includes("<video controls"), "Video must use custom controls");
     assert(!html.includes("autoplay"), "Video must not have autoplay attribute");
     assert(!html.includes("loop"), "Video must not have loop attribute");
   });
@@ -688,7 +729,8 @@ async function runSuite() {
       html.includes('data-is-purchasable="true"'),
       "Available pair must resolve as purchasable"
     );
-    assert(html.includes("Available to order (Made-to-order)"), "Must show available indicator");
+    assert(html.includes("Available to order"), "Must show available indicator");
+    assert(!html.includes("Made-to-order"), "Must not claim an unconfirmed business rule");
   });
 
   await runTest(
@@ -924,12 +966,9 @@ async function runSuite() {
     assert(!shopPageSource.toLowerCase().includes("wishlist"), "Shop must not reference wishlist");
   });
 
-  await runTest("62. no review submission introduced", () => {
-    assert(!pdpPageSource.includes("<ReviewForm"), "PDP must not render review submission form");
-    assert(
-      !pdpPageSource.includes("write a review"),
-      "PDP must not contain write a review trigger"
-    );
+  await runTest("62. PDP includes the product-bound review section", () => {
+    assert(pdpPageSource.includes("<ProductReviewsSection"), "PDP must render product reviews");
+    assert(pdpPageSource.includes("productId={product.id}"), "Reviews must bind to current product");
   });
 
   await runTest("63. no checkout introduced", () => {
@@ -941,6 +980,214 @@ async function runSuite() {
     assert(!pdpPageSource.toLowerCase().includes("stripe"), "No Stripe in PDP");
     assert(!pdpPageSource.toLowerCase().includes("paypal"), "No PayPal in PDP");
     assert(!pdpPageSource.toLowerCase().includes("credit card"), "No credit card gateway in PDP");
+  });
+
+  await runTest("64a. available selections have distinct light and strong storefront states", () => {
+    const unselected = renderToStaticMarkup(
+      <ProductPurchaseConfigurator
+        sizes={mockSizes}
+        colors={mockColors}
+        variants={mockVariants}
+        productName="Festive Kurta"
+      />
+    );
+    assert(unselected.includes('aria-pressed="false"'), "Multiple options start unselected");
+    assert(unselected.includes("bg-[var(--color-storefront-accent-soft)]"), "Available options use a light surface");
+    assert(unselected.includes("Select Size &amp; Color"), "Incomplete selection needs guidance");
+
+    const selected = renderToStaticMarkup(
+      <ProductPurchaseConfigurator
+        sizes={[mockSizes[0]]}
+        colors={[mockColors[0]]}
+        variants={[mockVariants[0]]}
+        productName="Festive Kurta"
+      />
+    );
+    const selectedButtons = selected.match(/<button[^>]*aria-pressed="true"[^>]*>/g) || [];
+    assert(selectedButtons.length === 2, "Size and color are selected");
+    for (const button of selectedButtons) {
+      assert(button.includes("bg-[var(--color-storefront-contrast)]"), "Selected option uses strong storefront surface");
+      assert(button.includes("text-white"), "Selected option has high-contrast text");
+    }
+    assert(selected.includes('data-is-purchasable="true"'), "Exact available variant is purchasable");
+    assert(selected.includes("Add to Cart"), "Available selection has cart CTA");
+  });
+
+  await runTest("64b. product card preserves media, price, badge, and independent PDP links", () => {
+    const html = renderToStaticMarkup(
+      <ProductCard {...mockCard1} storefrontSlug="mini-sprouts" />
+    );
+    assert(html.includes("shirt-main.jpg"), "Main image appears");
+    assert(html.includes("shirt-hover.jpg"), "Hover image appears");
+    assert(html.includes("Classic Linen Shirt"), "Title appears");
+    assert(html.includes("2,499"), "Price appears");
+    assert(html.includes("New"), "Data-backed badge appears");
+    assert(html.includes('href="/mini-sprouts/products/classic-linen-shirt"'), "PDP link appears");
+    assert(html.includes('aria-label="View Classic Linen Shirt"'), "Image link has an accessible name");
+    assert((html.match(/href="\/mini-sprouts\/products\/classic-linen-shirt"/g) || []).length === 2, "Image and title both link to PDP");
+  });
+
+  await runTest("64c. catalog grid keeps one through eight cards left-aligned at four desktop columns", () => {
+    for (const count of [1, 2, 3, 4, 5, 8]) {
+      const products = Array.from({ length: count }, (_, index) => ({
+        ...mockCard1,
+        id: `product-${index}`,
+        slug: `product-${index}`,
+      }));
+      const html = renderToStaticMarkup(<CatalogGrid products={products} storefront="mini-sprouts" />);
+      assert((html.match(/<article\b/g) || []).length === count, `Must render ${count} cards`);
+      assert(html.includes("grid-cols-1"), "Mobile has one column");
+      assert(html.includes("sm:grid-cols-2"), "Tablet has two columns");
+      assert(html.includes("lg:grid-cols-4"), "Desktop has no more than four columns");
+      assert(!html.includes("mx-auto max-w-"), "Product row does not center a short list");
+      assert(html.includes("max-w-[20rem]"), "Cards retain a sensible maximum width");
+    }
+  });
+
+  await runTest("64d. card shows only available text colors and independent controls", () => {
+    const colors = availableQuickAddColors(quickAddCard.quickAdd);
+    assert.deepStrictEqual(colors.map((color) => color.name), ["Cream", "Navy"]);
+    const html = renderToStaticMarkup(<ProductCard {...quickAddCard} storefrontSlug="mini-sprouts" />);
+    assert(html.includes("Cream") && html.includes("Navy"), "Available colors render");
+    assert(!html.includes("Pink"), "Unavailable color is absent");
+    assert(html.includes("Add to Cart"), "Quick Add CTA renders");
+    assert(!/<a\b[^>]*>[\s\S]*?<button\b[\s\S]*?<\/a>/.test(html), "Buttons cannot be nested in product links");
+    const singleColorCard = {
+      ...quickAddCard,
+      quickAdd: {
+        ...quickAddCard.quickAdd!,
+        colors: [quickAddCard.quickAdd!.colors[0]],
+        variants: [quickAddCard.quickAdd!.variants[0]],
+      },
+    };
+    const selectedHtml = renderToStaticMarkup(
+      <ProductCard {...singleColorCard} storefrontSlug="mini-sprouts" />
+    );
+    assert(selectedHtml.includes('aria-pressed="true"'), "Sole available color is visibly selected");
+    assert(selectedHtml.includes("✓ Cream"), "Selected state includes a non-color indicator");
+    assert(selectedHtml.includes("bg-[var(--color-storefront-contrast)]"), "Selected color uses strong storefront styling");
+  });
+
+  await runTest("64e. quick add accepts only an exact available Size + Color variant", () => {
+    const options = quickAddCard.quickAdd!;
+    assert.deepStrictEqual(
+      quickAddSizesForColor(options, "cream").map((size) => size.isAvailable),
+      [true, false, false]
+    );
+    assert.deepStrictEqual(
+      quickAddSizesForColor(options, "navy").map((size) => size.isAvailable),
+      [false, true, false]
+    );
+    assert(resolveQuickAddVariant(options, "cream", null) === null, "Color alone cannot resolve a variant");
+    assert(resolveQuickAddVariant(options, "cream", "6-7y") === null, "Unavailable size cannot resolve a variant");
+    assert(resolveQuickAddVariant(options, "cream", "2-3y")?.variant.id === options.variants[0].id);
+    assert(retainQuickAddSize(options, "navy", "2-3y") === null, "Changing color clears an invalid size");
+    assert(retainQuickAddSize(options, "cream", "2-3y") === "2-3y", "Valid size is retained");
+  });
+
+  await runTest("64f. quick add sends exact variant and PDP-compatible cached cart details", () => {
+    const added: Array<Parameters<CartState["addItem"]>[0]> = [];
+    const addItem: CartState["addItem"] = (item) => {
+      added.push(item);
+      return { success: true };
+    };
+    assert(addProductCardVariant(quickAddCard, "mini-sprouts", "cream", null, addItem) === null);
+    assert(addProductCardVariant(quickAddCard, "mini-sprouts", "cream", "6-7y", addItem) === null);
+    assert(added.length === 0, "Invalid selections must not mutate cart");
+    const result = addProductCardVariant(quickAddCard, "mini-sprouts", "cream", "2-3y", addItem);
+    assert(result?.success === true);
+    assert.deepStrictEqual(added.length, 1);
+    assert(added[0].productId === quickAddCard.id);
+    assert(added[0].variantId === quickAddCard.quickAdd!.variants[0].id);
+    assert(added[0].quantity === 1);
+    assert(added[0].cachedProduct?.sizeName === "2–3Y");
+    assert(added[0].cachedProduct?.colorName === "Cream");
+    assert(added[0].cachedProduct?.unitPrice === quickAddCard.regularPrice);
+  });
+
+  await runTest("64g. transient success fades and clears at 3.5 seconds, while errors persist", () => {
+    let now = 0;
+    let nextId = 1;
+    const pending = new Map<number, { at: number; callback: () => void }>();
+    const clock: FeedbackClock = {
+      setTimeout: (callback, delay) => {
+        const id = nextId++;
+        pending.set(id, { at: now + delay, callback });
+        return id as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimeout: (timer) => { pending.delete(timer as unknown as number); },
+    };
+    const advance = (milliseconds: number) => {
+      const target = now + milliseconds;
+      while (true) {
+        const due = [...pending.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (!due || due[1].at > target) break;
+        pending.delete(due[0]);
+        now = due[1].at;
+        due[1].callback();
+      }
+      now = target;
+    };
+    const events: string[] = [];
+    let cancel = scheduleTransientFeedback(() => events.push("fade"), () => events.push("remove"), clock);
+    advance(1000);
+    cancel();
+    cancel = scheduleTransientFeedback(() => events.push("fade"), () => events.push("remove"), clock);
+    advance(TRANSIENT_FEEDBACK_DURATION_MS - TRANSIENT_FEEDBACK_FADE_MS - 1);
+    assert.deepStrictEqual(events, [], "Repeat action restarts the dismissal timer");
+    advance(1);
+    assert.deepStrictEqual(events, ["fade"]);
+    advance(TRANSIENT_FEEDBACK_FADE_MS);
+    assert.deepStrictEqual(events, ["fade", "remove"]);
+    cancel();
+    assert(shouldAutoDismiss({ type: "success" }));
+    assert(shouldAutoDismiss({ type: "info" }));
+    assert(!shouldAutoDismiss({ type: "error" }), "Actionable errors stay visible");
+    assert(!shouldAutoDismiss({ type: "warning" }));
+  });
+
+  await runTest("64h. browserClock uses bound browser timers preventing Illegal invocation", () => {
+    const originalWindow = (globalThis as unknown as { window?: unknown }).window;
+    try {
+      let setTimeoutThisVerified = false;
+      let clearTimeoutThisVerified = false;
+      const mockWindow = {
+        setTimeout: function (this: unknown, callback: () => void, delay: number) {
+          if (this !== mockWindow) {
+            throw new TypeError("Illegal invocation");
+          }
+          setTimeoutThisVerified = true;
+          return 777;
+        },
+        clearTimeout: function (this: unknown, timerId: number) {
+          if (this !== mockWindow) {
+            throw new TypeError("Illegal invocation");
+          }
+          clearTimeoutThisVerified = true;
+        },
+      };
+      (globalThis as unknown as { window?: unknown }).window = mockWindow;
+
+      assert.doesNotThrow(() => {
+        const id = browserClock.setTimeout(() => {}, 10);
+        assert.strictEqual(id, 777);
+        assert.strictEqual(setTimeoutThisVerified, true);
+        browserClock.clearTimeout(id);
+        assert.strictEqual(clearTimeoutThisVerified, true);
+      });
+
+      // Default clock in scheduleTransientFeedback must not throw Illegal invocation
+      assert.doesNotThrow(() => {
+        const cleanup = scheduleTransientFeedback(() => {}, () => {});
+        cleanup();
+      });
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as unknown as { window?: unknown }).window;
+      } else {
+        (globalThis as unknown as { window?: unknown }).window = originalWindow;
+      }
+    }
   });
 
   // Summary

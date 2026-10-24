@@ -56,7 +56,6 @@ export function getAdminCookieOptions() {
     secure: env.COOKIE_SECURE,
     sameSite: env.COOKIE_SAME_SITE,
     path: "/",
-    maxAge: env.ADMIN_SESSION_TTL_HOURS * 3600, // In seconds for @fastify/cookie
   };
 }
 

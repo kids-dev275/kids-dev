@@ -50,12 +50,14 @@ export function NewArrivalsSection({
         {items.slice(0, 4).map((p) => (
           <ProductCard
             key={p.id}
+            id={p.id}
             name={p.name}
             slug={p.slug}
             regularPrice={p.regularPrice}
             compareAtPrice={p.compareAtPrice}
             isNewArrival={p.isNewArrival}
             storefrontSlug={storefront}
+            quickAdd={p.quickAdd}
             mainImage={{
               url: p.mainImage.url,
               altText: p.mainImage.altText,

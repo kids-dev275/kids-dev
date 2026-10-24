@@ -6,6 +6,7 @@ export interface PolicyContainerProps {
   title: string;
   description?: string;
   lastUpdated?: string;
+  wide?: boolean;
   children: React.ReactNode;
 }
 
@@ -19,11 +20,12 @@ export function PolicyContainer({
   title,
   description,
   lastUpdated,
+  wide = false,
   children,
 }: PolicyContainerProps) {
   return (
     <PageContainer className="py-10 sm:py-16">
-      <article className="max-w-3xl mx-auto">
+      <article className={`mx-auto ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
         {/* Header Block */}
         <header className="mb-10 sm:mb-12 border-b border-border pb-8">
           {badge && (

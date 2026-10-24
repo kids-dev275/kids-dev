@@ -86,7 +86,7 @@ export function CartLineItem({ item, onQuantityChange, onRemove }: CartLineItemP
           </div>
 
           {/* Authoritative Unit Price */}
-          <div className="text-xs font-sans text-text-muted pt-0.5">
+          <div className="text-xs font-sans tabular-nums text-text-muted pt-0.5">
             Unit Price:{" "}
             <span className="font-semibold text-ink">{formatPKR(item.unitPrice, true)}</span>
           </div>
@@ -127,7 +127,7 @@ export function CartLineItem({ item, onQuantityChange, onRemove }: CartLineItemP
         {/* Line Subtotal */}
         <div className="text-right sm:min-w-[90px]">
           <span className="block text-xs font-sans text-text-muted sm:hidden">Subtotal:</span>
-          <span className="font-sans text-sm sm:text-base font-semibold text-ink tracking-tight">
+          <span className="font-sans tabular-nums text-sm sm:text-base font-semibold text-ink tracking-tight">
             {formatPKR(item.lineSubtotal, true)}
           </span>
         </div>

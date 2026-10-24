@@ -6,11 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCustomerAuth } from "@/lib/customer-auth-context";
 import { loginCustomer } from "@/lib/api";
 import { getSafeNextUrl } from "@/lib/safe-redirect";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormField, FieldLabel, FieldError } from "@/components/ui/form";
 import { Input } from "@/components/ui/form/input";
-import { Alert, LoadingSpinner } from "@/components/ui/feedback";
+import { Alert } from "@/components/ui/feedback";
+import {
+  CustomerAuthCard,
+  PasswordField,
+  authButtonClassName,
+  authInputClassName,
+  authLabelClassName,
+} from "@/components/account/customer-auth-ui";
 
 function LoginForm() {
   const router = useRouter();
@@ -86,79 +92,77 @@ function LoginForm() {
     : "/account/register";
 
   return (
-    <div className="max-w-md mx-auto py-6 sm:py-10">
-      <Card className="p-6 sm:p-8 space-y-6">
-        <div className="space-y-1.5 text-center">
-          <span className="text-xs uppercase tracking-wider font-semibold text-accent-storefront font-sans">
-            Welcome Back
-          </span>
-          <h1 className="font-editorial text-2xl sm:text-3xl text-ink font-normal">
-            Customer Sign In
-          </h1>
-          <p className="text-xs sm:text-sm text-text-muted font-sans">
-            Sign in to access your order history and profile.
-          </p>
+    <CustomerAuthCard
+      variant="login"
+      eyebrow="Welcome Back"
+      heading="Sign In to Kids Wear"
+      description="Sign in to view your orders and manage your profile."
+      footer={
+        <>
+          Don&apos;t have an account?{" "}
+          <Link
+            href={registerHref}
+            className="font-semibold text-accent-storefront hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+          >
+            Create Account
+          </Link>
+        </>
+      }
+    >
+      {serverError && (
+        <Alert variant="error" title="Sign In Error">
+          {serverError}
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        <FormField isInvalid={!!errors.email} isRequired>
+          <FieldLabel className={authLabelClassName}>Email Address</FieldLabel>
+          <Input
+            type="email"
+            autoComplete="email"
+            placeholder="customer@example.com"
+            className={authInputClassName}
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          {errors.email && <FieldError>{errors.email}</FieldError>}
+        </FormField>
+
+        <FormField isInvalid={!!errors.password} isRequired>
+          <FieldLabel className={authLabelClassName}>Password</FieldLabel>
+          <PasswordField
+            visibilityLabel="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            disabled={isSubmitting}
+          />
+          {errors.password && <FieldError>{errors.password}</FieldError>}
+        </FormField>
+
+        <div className="pt-1">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+            className={authButtonClassName}
+          >
+            Sign In
+          </Button>
         </div>
-
-        {serverError && (
-          <Alert variant="error" title="Sign In Error">
-            {serverError}
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <FormField isInvalid={!!errors.email} isRequired>
-            <FieldLabel>Email Address</FieldLabel>
-            <Input
-              type="email"
-              autoComplete="email"
-              placeholder="customer@example.com"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            {errors.email && <FieldError>{errors.email}</FieldError>}
-          </FormField>
-
-          <FormField isInvalid={!!errors.password} isRequired>
-            <FieldLabel>Password</FieldLabel>
-            <Input
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-              }}
-              disabled={isSubmitting}
-            />
-            {errors.password && <FieldError>{errors.password}</FieldError>}
-          </FormField>
-
-          <div className="pt-2">
-            <Button type="submit" variant="primary" fullWidth isLoading={isSubmitting}>
-              Sign In
-            </Button>
-          </div>
-        </form>
-
-        <div className="text-center pt-2 border-t border-border">
-          <p className="text-xs sm:text-sm text-text-muted font-sans">
-            Don&apos;t have an account yet?{" "}
-            <Link
-              href={registerHref}
-              className="text-accent-storefront font-semibold hover:underline"
-            >
-              Create Account
-            </Link>
-          </p>
-        </div>
-      </Card>
-    </div>
+      </form>
+    </CustomerAuthCard>
   );
 }
 
@@ -166,8 +170,8 @@ export default function CustomerLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-md mx-auto py-6 sm:py-10">
-          <div className="p-6 sm:p-8 space-y-6 border border-border rounded-lg bg-surface min-h-[460px] animate-pulse" />
+        <div className="mx-auto max-w-[490px] py-3 sm:py-5">
+          <div className="min-h-[510px] animate-pulse rounded-[24px] border border-border bg-surface" />
         </div>
       }
     >

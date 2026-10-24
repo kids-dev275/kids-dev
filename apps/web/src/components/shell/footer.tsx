@@ -1,174 +1,90 @@
-import React from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { StorefrontSlug } from "@/components/theme/storefront-tokens";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { STOREFRONT_THEMES, STOREFRONT_SLUGS } from "@/components/theme/storefront-tokens";
 
-export interface FooterProps {
-  className?: string;
-}
+const CUSTOMER_CARE_LINKS = [
+  ["About Us", "/about"],
+  ["Contact", "/contact"],
+  ["Shipping Policy", "/shipping-policy"],
+  ["Return & Exchange Policy", "/return-exchange-policy"],
+  ["Privacy Policy", "/privacy-policy"],
+  ["Terms & Conditions", "/terms"],
+] as const;
 
-const STOREFRONT_LINKS: { slug: StorefrontSlug; name: string; ageRange: string }[] = [
-  { slug: "mini-sprouts", name: "Mini Sprouts", ageRange: "0–10 Years" },
-  { slug: "teen-studio", name: "Teen Studio", ageRange: "11–16 Years" },
-  { slug: "aura-studio", name: "Aura Studio", ageRange: "17+ Years" },
-];
-
-const POLICY_LINKS = [
-  { label: "About Us", href: "/about" },
-  { label: "Contact", href: "/contact" },
-  { label: "Shipping Policy", href: "/shipping-policy" },
-  { label: "Return & Exchange Policy", href: "/return-exchange-policy" },
-  { label: "Privacy Policy", href: "/privacy-policy" },
-  { label: "Terms of Service", href: "/terms" },
-];
-
-const SOCIAL_LINKS = [
-  {
-    name: "Facebook",
-    href: "https://www.facebook.com/profile.php?id=100057616711479",
-  },
-  {
-    name: "Instagram",
-    href: "https://www.instagram.com/kidswearattire/",
-  },
-  {
-    name: "Pinterest",
-    href: "https://www.pinterest.com/khalil786tfw/",
-  },
-  {
-    name: "TikTok",
-    href: "https://www.tiktok.com/@kids.wear251?_r=1&_t=ZS-9AU3ONhdbgm",
-  },
-  {
-    name: "Threads",
-    href: "https://www.threads.com/@kidswearattire?invite=0",
-  },
-];
-
-/**
- * Shared customer Footer component.
- * Exposes approved storefront navigation, informational and policy destinations,
- * and confirmed business contact information.
- */
-export function Footer({ className = "" }: FooterProps) {
+/** Shared customer-facing footer, themed by the surrounding StorefrontScope. */
+export function Footer() {
   return (
-    <footer className={`border-t border-border bg-surface text-text-base ${className}`.trim()}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
-          {/* Column 1: Brand & Overview */}
-          <div className="lg:col-span-2 space-y-4">
+    <footer className="border-t border-border bg-surface">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
+        <div>
+          <Link href="/">
+            <Image
+              src="/brand/kids-wear-logo.webp"
+              alt="Kids Wear"
+              width={105}
+              height={68}
+              className="h-16 w-auto object-contain"
+            />
+          </Link>
+          <p className="mt-3 text-sm text-text-muted">
+            Apparel for three age groups, delivered across Pakistan.
+          </p>
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Storefronts</h2>
+          {STOREFRONT_SLUGS.map((slug) => (
             <Link
-              href="/"
-              className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront rounded"
+              className="mb-2 block text-sm text-text-base hover:text-[var(--color-storefront-contrast)]"
+              key={slug}
+              href={`/${slug}`}
+              prefetch={false}
             >
-              <span className="font-editorial text-2xl sm:text-3xl text-ink font-normal tracking-tight">
-                Kids Wear
-              </span>
+              {STOREFRONT_THEMES[slug].name} — {STOREFRONT_THEMES[slug].ageRange}
             </Link>
-            <p className="font-sans text-sm text-text-base/80 max-w-sm leading-relaxed">
-              Kids Wear apparel across three age-based storefronts, delivered across Pakistan within
-              10 days.
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/"
-                className="font-sans text-xs font-semibold text-ink hover:text-accent-storefront hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-storefront rounded"
-              >
-                &larr; Switch Storefront / Visit Root Gateway
-              </Link>
-            </div>
-          </div>
-
-          {/* Column 2: Storefronts */}
-          <div className="space-y-3">
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-ink">
-              Storefronts
-            </h3>
-            <ul className="space-y-2 text-sm">
-              {STOREFRONT_LINKS.map((s) => (
-                <li key={s.slug}>
-                  <Link
-                    href={`/${s.slug}`}
-                    className="hover:text-accent-storefront transition-colors"
-                  >
-                    {s.name} <span className="text-xs text-text-muted">({s.ageRange})</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 3: Customer Care & Policies */}
-          <div className="space-y-3">
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-ink">
-              Customer Care
-            </h3>
-            <ul className="space-y-2 text-sm">
-              {POLICY_LINKS.map((p) => (
-                <li key={p.href}>
-                  <Link href={p.href} className="hover:text-accent-storefront transition-colors">
-                    {p.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 4: Contact & Business Address */}
-          <div className="space-y-3">
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-ink">
-              Contact & Business Address
-            </h3>
-            <div className="space-y-1.5 text-xs text-text-base/80 leading-relaxed font-sans">
-              <p className="font-medium text-ink">Phone:</p>
-              <a
-                href="tel:+923350981321"
-                className="hover:text-accent-storefront transition-colors block"
-              >
-                +92 335 0981 321
-              </a>
-              <p className="font-medium text-ink pt-1">Email:</p>
-              <a
-                href="mailto:info@thekidswear.com"
-                className="hover:text-accent-storefront transition-colors block"
-              >
-                info@thekidswear.com
-              </a>
-              <p className="font-medium text-ink pt-1">Business Address:</p>
-              <address className="not-italic leading-relaxed">
+          ))}
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Customer Care</h2>
+          {CUSTOMER_CARE_LINKS.map(([label, href]) => (
+            <Link
+              className="mb-2 block text-sm text-text-base hover:text-[var(--color-storefront-contrast)]"
+              key={href}
+              href={href}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-ink">Contact &amp; Business Address</h2>
+          <a
+            className="mb-2 flex items-start gap-2.5 text-sm text-text-base hover:text-[var(--color-storefront-contrast)]"
+            href="tel:+923350981321"
+          >
+            <Phone size={17} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--color-storefront-contrast)]" aria-hidden="true" />
+            <span>+92 335 0981321</span>
+          </a>
+          <a
+            className="mb-2 flex items-start gap-2.5 text-sm text-text-base hover:text-[var(--color-storefront-contrast)]"
+            href="mailto:info@thekidswear.com"
+          >
+            <Mail size={17} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--color-storefront-contrast)]" aria-hidden="true" />
+            <span className="min-w-0 break-words">info@thekidswear.com</span>
+          </a>
+          <div className="flex items-start gap-2.5">
+            <MapPin size={17} strokeWidth={1.75} className="mt-0.5 shrink-0 text-[var(--color-storefront-contrast)]" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="mb-1 text-sm font-semibold text-ink">Business Address</p>
+              <address className="text-sm not-italic text-text-muted">
                 Street-05, Darul Islam Colony, Attock, Pakistan
               </address>
             </div>
-
-            {/* Social Links */}
-            <div className="pt-2">
-              <span className="block font-sans text-xs font-semibold uppercase tracking-wider text-ink mb-2">
-                Follow Us
-              </span>
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
-                {SOCIAL_LINKS.map((s) => (
-                  <a
-                    key={s.name}
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="min-h-[24px] inline-flex items-center text-text-muted hover:text-accent-storefront transition-colors py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-storefront rounded"
-                  >
-                    {s.name}
-                  </a>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
-
-        {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-text-muted">
-          <p>&copy; {new Date().getFullYear()} Kids Wear. All rights reserved.</p>
-          <p>
-            Pakistan-Wide Delivery &bull; Delivery Within 10 Days &bull; Cash on Delivery & Bank
-            Transfer
-          </p>
-        </div>
+      </div>
+      <div className="border-t border-border px-4 py-4 text-center text-xs text-text-muted">
+        © {new Date().getFullYear()} Kids Wear. All rights reserved.
       </div>
     </footer>
   );

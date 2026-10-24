@@ -11,6 +11,7 @@ import {
 } from "../src/components/reviews/review-submission-form";
 import { ProductReviewsSection } from "../src/components/pdp/product-reviews-section";
 import { ReviewsPreview } from "../src/components/home/reviews-preview";
+import { selectStorefrontReviews } from "../src/components/home/storefront-home-sections";
 import ReviewsPage from "../src/app/reviews/page";
 import type {
   PublicReviewItem,
@@ -37,6 +38,10 @@ async function runTest(name: string, fn: () => void | Promise<void>): Promise<vo
     console.error(`  ✗ ${name}`);
     console.error(`    ${errorMsg}`);
   }
+}
+
+function renderSharedPageContent(element: React.ReactElement): string {
+  return renderToStaticMarkup((element.props as { children: React.ReactNode }).children);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +104,7 @@ const MOCK_APPROVED_REVIEW_2: PublicReviewItem = {
 
 const MOCK_SETTINGS: ApiPublicSettings = {
   announcement: {
-    text: "Free nationwide delivery on orders above Rs. 5000",
+    text: "Pakistan-Wide Delivery Available",
     link: null,
     isActive: true,
   },
@@ -244,12 +249,17 @@ async function runSuite() {
     });
 
     await runTest(
-      "12. ReviewSubmissionForm preselects product when preselectedProductId is provided",
+      "12. PDP ReviewSubmissionForm fixes the current product without a selector",
       () => {
         const html = renderToStaticMarkup(
-          <ReviewSubmissionForm products={MOCK_PRODUCTS} preselectedProductId="prod-1111-aaaa" />
+          <ReviewSubmissionForm
+            products={[]}
+            preselectedProductId="prod-1111-aaaa"
+            preselectedProductName="Festive Embroidered Kurta"
+          />
         );
-        assert(html.includes('value="prod-1111-aaaa"'), "Preselected product option must exist");
+        assert(html.includes("Festive Embroidered Kurta"), "Current product must be identified");
+        assert(!html.includes('id="review-product"'), "PDP form must not offer product selection");
       }
     );
 
@@ -357,7 +367,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(html.includes("Customer Reviews"), "Header title must render");
       assert(html.includes("Ayesha Malik"), "Review 1 must render");
@@ -402,7 +412,7 @@ async function runSuite() {
         }) as typeof fetch;
 
         const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-        const html = renderToStaticMarkup(pageElement);
+        const html = renderSharedPageContent(pageElement);
 
         assert(html.includes("No Reviews Published Yet"), "Honest empty state heading must render");
         assert(
@@ -448,7 +458,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({ page: "1" }) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(html.includes("Review pagination"), "Pagination container must render");
       assert(html.includes("Page 1 of 3"), "Page count indicator must render");
@@ -490,7 +500,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({ page: "1" }) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(!html.includes("/reviews?page=0"), "No page 0 link on page 1");
       assert(html.includes("cursor-not-allowed"), "Previous button must be disabled on page 1");
@@ -531,7 +541,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({ page: "2" }) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(html.includes("/reviews?page=1"), "Previous page link must be active");
       assert(html.includes("Page 2 of 2"), "Page 2 of 2 indicator must render");
@@ -573,7 +583,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(
         !html.includes('aria-label="Review pagination"'),
@@ -618,7 +628,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(
         !html.includes("Pending moderation"),
@@ -662,7 +672,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(!html.includes("HIDDEN"), "No HIDDEN string in public reviews");
     });
@@ -731,7 +741,7 @@ async function runSuite() {
 
         assert(html.includes("No Reviews Yet"), "Honest empty heading must render");
         assert(
-          html.includes("There are no published reviews for this product yet."),
+          html.includes("Be the first to review Classic Linen Shalwar Set."),
           "Honest empty message must render"
         );
       }
@@ -801,7 +811,7 @@ async function runSuite() {
     );
 
     await runTest(
-      "33. ProductReviewsSection contains NO 'write a review' text (Strict Storefront Test 62 Compliance)",
+      "33. ProductReviewsSection offers Write a Review for the current product",
       async () => {
         global.fetch = (async () => {
           return new Response(JSON.stringify({ success: true, data: { reviews: [] } }), {
@@ -816,8 +826,8 @@ async function runSuite() {
         const html = renderToStaticMarkup(element);
 
         assert(
-          !html.toLowerCase().includes("write a review"),
-          "ProductReviewsSection must not contain 'write a review' text directly on PDP"
+          html.includes("Write a Review"),
+          "ProductReviewsSection must offer a review action on PDP"
         );
       }
     );
@@ -911,6 +921,39 @@ async function runSuite() {
       assert(html.includes("Usman Tariq"), "Review 2 must render");
       assert(html.includes("Third Reviewer"), "Review 3 must render");
       assert(!html.includes("Fourth Reviewer"), "Review 4 must be excluded on homepage preview");
+    });
+
+    await runTest("38a. storefront homepage uses four highest-rated reviews with newest ties", () => {
+      const createReview = (
+        id: string,
+        rating: number,
+        createdAt: string,
+        storefrontSlug: string
+      ): PublicReviewItem => ({
+        ...MOCK_APPROVED_REVIEW_1,
+        id,
+        rating,
+        createdAt,
+        product: { ...MOCK_APPROVED_REVIEW_1.product, storefrontSlug },
+      });
+      const allReviews = [
+        createReview("mini-old", 5, "2026-10-15T00:00:00.000Z", "mini-sprouts"),
+        createReview("teen", 5, "2026-10-21T00:00:00.000Z", "teen-studio"),
+        createReview("mini-low", 2, "2026-10-20T00:00:00.000Z", "mini-sprouts"),
+        createReview("mini-new", 5, "2026-10-20T00:00:00.000Z", "mini-sprouts"),
+        createReview("mini-mid", 4, "2026-10-18T00:00:00.000Z", "mini-sprouts"),
+        createReview("mini-fourth", 3, "2026-10-19T00:00:00.000Z", "mini-sprouts"),
+      ];
+      const mini = selectStorefrontReviews(allReviews, "mini-sprouts");
+      assert.deepStrictEqual(
+        mini.map((review) => review.id),
+        ["mini-new", "mini-old", "mini-mid", "mini-fourth"]
+      );
+      assert.deepStrictEqual(
+        selectStorefrontReviews(allReviews, "teen-studio").map((review) => review.id),
+        ["teen"]
+      );
+      assert.deepStrictEqual(selectStorefrontReviews(allReviews, "aura-studio"), []);
     });
 
     // ========================================================================
@@ -1008,7 +1051,7 @@ async function runSuite() {
         }) as typeof fetch;
 
         const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-        const html = renderToStaticMarkup(pageElement);
+        const html = renderSharedPageContent(pageElement);
         assert(
           !html.toLowerCase().includes("verified purchase"),
           "Must not claim verified purchase"
@@ -1084,7 +1127,7 @@ async function runSuite() {
       }) as typeof fetch;
 
       const pageElement = await ReviewsPage({ searchParams: Promise.resolve({}) });
-      const html = renderToStaticMarkup(pageElement);
+      const html = renderSharedPageContent(pageElement);
 
       assert(html.includes("No Reviews Published Yet"), "Honest empty title");
       assert(!html.includes("5.0"), "Must not fabricate 5.0 rating");

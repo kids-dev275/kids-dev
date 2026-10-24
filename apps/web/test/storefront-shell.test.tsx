@@ -132,10 +132,10 @@ async function runSuite() {
   await runTest("6. active Announcement renders", () => {
     const html = renderToStaticMarkup(
       <AnnouncementBar
-        announcement={{ text: "Eid Delivery Guaranteed", link: null, isActive: true }}
+        announcement={{ text: "Pakistan-Wide Delivery Available", link: null, isActive: true }}
       />
     );
-    assert(html.includes("Eid Delivery Guaranteed"), "Must render active announcement text");
+    assert(html.includes("Pakistan-Wide Delivery Available"), "Must render active announcement text");
     assert(html.includes('aria-label="Announcement"'), "Must provide accessible landmark");
   });
 
@@ -290,15 +290,13 @@ async function runSuite() {
     assert(html.includes('href="/mini-sprouts/shop"'), "Hero must render cta link");
   });
 
-  await runTest("18. Hero empty state does not render broken controls", () => {
+  await runTest("18. local Hero fallback has valid slides and controls", () => {
     const html = renderToStaticMarkup(<HeroSlider slides={[]} storefront="mini-sprouts" />);
-    assert(!html.includes("Previous slide"), "Empty hero must not render prev button");
-    assert(!html.includes("Next slide"), "Empty hero must not render next button");
-    assert(!html.includes('role="tablist"'), "Empty hero must not render indicator dots");
-    assert(
-      html.includes("Welcome to Mini Sprouts"),
-      "Empty hero must render graceful fallback welcome"
-    );
+    assert(html.includes("Mini Sprouts"), "Fallback must identify the storefront");
+    assert(html.includes("/images/hero/mini-sprouts/mini-sprouts-hero-01-desktop.webp"), "Fallback must use a local hero image");
+    assert(html.includes('aria-label="Previous slide"'), "Three fallback slides need previous control");
+    assert(html.includes('aria-label="Next slide"'), "Three fallback slides need next control");
+    assert(html.includes('aria-label="Go to slide 3 of 3"'), "Fallback indicators must describe all three slides");
   });
 
   await runTest("19. desktop/mobile Hero media contract supported", () => {
@@ -444,16 +442,12 @@ async function runSuite() {
     assert(!hasGlobalShop, "Footer must not contain global /shop link");
   });
 
-  await runTest("27. approved social platforms rendered", () => {
+  await runTest("27. shared footer renders confirmed contact details", () => {
     const html = renderToStaticMarkup(<Footer />);
-    assert(
-      html.includes("https://www.facebook.com/profile.php?id=100057616711479"),
-      "Must link Facebook"
-    );
-    assert(html.includes("https://www.instagram.com/kidswearattire/"), "Must link Instagram");
-    assert(html.includes("https://www.pinterest.com/khalil786tfw/"), "Must link Pinterest");
-    assert(html.includes("https://www.tiktok.com/@kids.wear251"), "Must link TikTok");
-    assert(html.includes("https://www.threads.com/@kidswearattire?invite=0"), "Must link Threads");
+    assert.strictEqual((html.match(/<footer\b/g) || []).length, 1, "Must render one shared footer");
+    assert(html.includes('href="tel:+923350981321"'), "Must link confirmed phone number");
+    assert(html.includes('href="mailto:info@thekidswear.com"'), "Must link confirmed email");
+    assert(html.includes("Street-05, Darul Islam Colony, Attock, Pakistan"), "Must show confirmed business address");
   });
 
   await runTest("28. unapproved social platforms absent", () => {
@@ -610,12 +604,7 @@ async function runSuite() {
     assert(!html.toLowerCase().includes("% off"), "No percent-off claims in empty hero state");
     assert(!html.toLowerCase().includes("sale"), "No sale claims in empty hero state");
     assert(!html.toLowerCase().includes("promo"), "No promo claims in empty hero state");
-    assert(
-      html.includes(
-        "Explore Kids Wear apparel for 0–10 Years, delivered across Pakistan within 10 days."
-      ),
-      "Must render approved neutral welcome copy"
-    );
+    assert(html.includes("Playful styles for everyday moments and special days."), "Must render approved Mini fallback copy");
   });
 
   // ============================================================================
@@ -722,24 +711,9 @@ async function runSuite() {
       assert(!auraHtml.toLowerCase().includes(term), `Hero fallback must not include '${term}'`);
     }
 
-    assert(
-      miniHtml.includes(
-        "Explore Kids Wear apparel for 0–10 Years, delivered across Pakistan within 10 days."
-      ),
-      "Mini hero fallback must have neutral copy"
-    );
-    assert(
-      teenHtml.includes(
-        "Explore Kids Wear apparel for 11–16 Years, delivered across Pakistan within 10 days."
-      ),
-      "Teen hero fallback must have neutral copy"
-    );
-    assert(
-      auraHtml.includes(
-        "Explore Kids Wear apparel for 17+ Years, delivered across Pakistan within 10 days."
-      ),
-      "Aura hero fallback must have neutral copy"
-    );
+    assert(miniHtml.includes("Playful styles for everyday moments and special days."), "Mini hero fallback must have approved copy");
+    assert(teenHtml.includes("Fresh, expressive styles designed for growing personalities."), "Teen hero fallback must have approved copy");
+    assert(auraHtml.includes("Modern silhouettes and versatile styles for every chapter."), "Aura hero fallback must have approved copy");
   });
 
   await runTest(

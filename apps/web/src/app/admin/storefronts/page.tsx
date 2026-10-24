@@ -1,8 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
+import {
+  AdminPageHeader,
+  AdminCard,
+  AdminCardHeader,
+  AdminCardTitle,
+  AdminCardDescription,
+  AdminBadge,
+  AdminAlert,
+  AdminModal,
+} from "@/components/admin/admin-ui";
 import {
   getAdminStorefronts,
   getAdminStorefrontHeroSlides,
@@ -19,12 +31,9 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
-  CheckCircle,
-  AlertCircle,
   Image as ImageIcon,
   Edit,
   Save,
-  X,
 } from "lucide-react";
 
 export default function AdminStorefrontsPage() {
@@ -34,7 +43,9 @@ export default function AdminStorefrontsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
+  const [slidesLoadFailed, setSlidesLoadFailed] = useState(false);
+  const slideRequestId = useRef(0);
 
   // Modal / Form state for Hero slide
   const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
@@ -63,6 +74,8 @@ export default function AdminStorefrontsPage() {
           if (res.data.storefronts.length > 0) {
             setSelectedStorefrontId(res.data.storefronts[0].id);
           }
+        } else {
+          setErrorMessage(res.error?.message || "Failed to load storefronts.");
         }
       } catch {
         setErrorMessage("Network error loading storefronts.");
@@ -79,19 +92,27 @@ export default function AdminStorefrontsPage() {
   // Fetch Hero slides when selected storefront changes
   const fetchSlides = useCallback(async () => {
     if (!selectedStorefrontId) return;
+    const requestId = ++slideRequestId.current;
     setIsLoading(true);
     setErrorMessage(null);
+    setSlidesLoadFailed(false);
+    setSlides([]);
     try {
       const res = await getAdminStorefrontHeroSlides(selectedStorefrontId);
+      if (requestId !== slideRequestId.current) return;
       if (res.success && res.data) {
         setSlides(res.data.heroSlides);
       } else {
+        setSlidesLoadFailed(true);
         setErrorMessage(res.error?.message || "Failed to load hero slides.");
       }
     } catch {
-      setErrorMessage("Network error loading hero slides.");
+      if (requestId === slideRequestId.current) {
+        setSlidesLoadFailed(true);
+        setErrorMessage("Network error loading hero slides.");
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === slideRequestId.current) setIsLoading(false);
     }
   }, [selectedStorefrontId]);
 
@@ -164,10 +185,7 @@ export default function AdminStorefrontsPage() {
           setErrorMessage(res.error?.message || "Failed to update hero slide.");
         }
       } else {
-        const res = await createAdminHeroSlide(selectedStorefrontId, {
-          ...payload,
-          sortOrder: slides.length + 1,
-        });
+        const res = await createAdminHeroSlide(selectedStorefrontId, payload);
         if (res.success) {
           setSuccessMessage("Hero slide created successfully.");
           setIsSlideModalOpen(false);
@@ -184,7 +202,11 @@ export default function AdminStorefrontsPage() {
   };
 
   const handleDeleteSlide = async (slideId: string) => {
-    if (!confirm("Are you sure you want to permanently delete this hero slide?")) return;
+    const confirmed = confirm(
+      "Are you sure you want to permanently delete this hero slide? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -192,8 +214,8 @@ export default function AdminStorefrontsPage() {
     try {
       const res = await deleteAdminHeroSlide(selectedStorefrontId, slideId);
       if (res.success) {
-        setSuccessMessage("Hero slide deleted.");
-        setSlides(slides.filter((s) => s.id !== slideId));
+        setSuccessMessage("Hero slide deleted successfully.");
+        await fetchSlides();
       } else {
         setErrorMessage(res.error?.message || "Failed to delete hero slide.");
       }
@@ -211,7 +233,7 @@ export default function AdminStorefrontsPage() {
         isActive: !slide.isActive,
       });
       if (res.success) {
-        setSlides(slides.map((s) => (s.id === slide.id ? { ...s, isActive: !s.isActive } : s)));
+        await fetchSlides();
         setSuccessMessage(`Slide marked as ${!slide.isActive ? "Active" : "Inactive"}.`);
       } else {
         setErrorMessage(res.error?.message || "Failed to update slide status.");
@@ -237,7 +259,7 @@ export default function AdminStorefrontsPage() {
     try {
       const res = await reorderAdminHeroSlides(selectedStorefrontId, slideIds);
       if (res.success) {
-        setSlides(copy);
+        await fetchSlides();
         setSuccessMessage("Hero slides reordered successfully.");
       } else {
         setErrorMessage(res.error?.message || "Failed to reorder hero slides.");
@@ -254,45 +276,38 @@ export default function AdminStorefrontsPage() {
       <AdminShell>
         <div className="space-y-6 max-w-5xl">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-brand-sand pb-4">
-            <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-brand-ink uppercase">
-                Storefronts & Hero Management
-              </h1>
-              <p className="text-xs uppercase tracking-wider text-brand-muted mt-0.5">
-                Manage hero slides and promotional banners across the 3 fixed storefronts
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleOpenCreateModal}
-              disabled={!selectedStorefrontId}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm transition-colors shadow-xs disabled:opacity-50"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Hero Slide</span>
-            </button>
-          </div>
+          <AdminPageHeader
+            title="Storefronts & Hero Management"
+            eyebrow="Visual Merchandising"
+            description="Manage hero slides and promotional banners across the 3 fixed storefronts"
+            action={
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                disabled={!selectedStorefrontId}
+                className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                <span>Add Hero Slide</span>
+              </button>
+            }
+          />
 
           {/* Feedback Messages */}
           {errorMessage && (
-            <div
-              className="p-4 bg-rose-50 border border-rose-200 rounded-sm flex items-start space-x-2 text-rose-800 text-xs"
-              role="alert"
-            >
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
+            <AdminAlert
+              type="error"
+              message={errorMessage}
+              onDismiss={() => setErrorMessage(null)}
+            />
           )}
-
           {successMessage && (
-            <div
-              className="p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs"
-              role="status"
-            >
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <span>{successMessage}</span>
-            </div>
+            <AdminAlert
+              type="success"
+              message={successMessage}
+              fading={successFading}
+              onDismiss={() => setSuccessMessage(null)}
+            />
           )}
 
           {/* Fixed Storefronts Selector */}
@@ -303,16 +318,20 @@ export default function AdminStorefrontsPage() {
                 <button
                   key={sf.id}
                   type="button"
-                  onClick={() => setSelectedStorefrontId(sf.id)}
-                  className={`p-4 border text-left rounded-sm transition-colors ${
+                  onClick={() => {
+                    setSelectedStorefrontId(sf.id);
+                    setSlides([]);
+                    setIsLoading(true);
+                  }}
+                  className={`p-4 border text-left rounded-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne ${
                     isSelected
-                      ? "border-brand-primary bg-white shadow-xs ring-1 ring-brand-primary"
-                      : "border-brand-sand bg-white/60 hover:bg-white"
+                      ? "border-champagne bg-brand-surface-soft/80 shadow-xs ring-1 ring-champagne"
+                      : "border-brand-border bg-white hover:bg-brand-surface-soft/40"
                   }`}
                 >
                   <div className="flex items-center space-x-2">
                     <Store
-                      className={`w-4 h-4 ${isSelected ? "text-brand-primary" : "text-brand-muted"}`}
+                      className={`w-4 h-4 ${isSelected ? "text-brand-ink" : "text-brand-muted"}`}
                     />
                     <span className="font-heading text-sm font-semibold uppercase text-brand-ink">
                       {sf.name}
@@ -327,53 +346,79 @@ export default function AdminStorefrontsPage() {
           </div>
 
           {/* Notice: Fixed Storefronts */}
-          <div className="p-3 bg-brand-sand/20 border border-brand-sand rounded-sm text-[11px] text-brand-muted">
-            <strong>Architecture Invariant:</strong> Storefront names, slugs, age ranges, and color
-            palettes are fixed application configurations and cannot be created, modified, or
-            deleted in the admin interface.
+          <div className="p-3.5 bg-brand-surface-soft border border-brand-border rounded-sm text-[11px] text-brand-muted">
+            Storefront names and age ranges are fixed. Manage each storefront&apos;s promotional
+            slides below.
           </div>
 
           {/* Hero Slides List for Selected Storefront */}
-          <div className="bg-white border border-brand-sand rounded-sm shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-brand-sand flex items-center justify-between">
+          <AdminCard className="overflow-hidden">
+            <AdminCardHeader>
               <div>
-                <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
-                  {currentStorefront?.name} Hero Slides
-                </h2>
-                <p className="text-[11px] text-brand-muted uppercase tracking-wider mt-0.5">
+                <AdminCardTitle>{currentStorefront?.name} Hero Slides</AdminCardTitle>
+                <AdminCardDescription>
                   Ordered sequential slides (Desktop 1920×800 • Mobile 1080×1350)
-                </p>
+                </AdminCardDescription>
               </div>
-              <span className="text-xs text-brand-muted font-medium">{slides.length} slide(s)</span>
-            </div>
+              <span className="text-xs text-brand-muted font-semibold uppercase tracking-wider">
+                {slides.length} stored slide(s)
+              </span>
+            </AdminCardHeader>
 
             {isLoading ? (
               <div className="p-8 text-center text-xs uppercase tracking-wider text-brand-muted font-medium">
                 Loading hero slides...
               </div>
+            ) : slidesLoadFailed ? (
+              <div className="p-8 text-center text-sm text-rose-800">
+                Hero slides could not be loaded. Retry before editing.
+              </div>
             ) : slides.length === 0 ? (
-              <div className="p-8 text-center text-xs uppercase tracking-wider text-brand-muted">
-                No hero slides created for this storefront yet.
+              <div className="p-8 text-center text-sm text-brand-muted">
+                No Admin hero slides configured for this storefront. Development fallback imagery is
+                not a stored slide.
               </div>
             ) : (
-              <div className="divide-y divide-brand-sand/60">
+              <div className="divide-y divide-brand-border/60">
+                <div className="bg-brand-canvas/50 px-5 py-2 text-xs text-brand-muted">
+                  {slides.filter((slide) => slide.isActive).length} active ·{" "}
+                  {slides.filter((slide) => !slide.isActive).length} inactive · shown in stored
+                  order
+                </div>
                 {slides.map((slide, idx) => (
                   <div
                     key={slide.id}
-                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                    className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-brand-surface-soft/30 transition-colors"
                   >
                     {/* Thumbnail */}
-                    <div className="w-24 h-14 bg-brand-sand/40 border border-brand-sand rounded-xs overflow-hidden shrink-0">
-                      {slide.desktopImageAsset?.secureUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={slide.desktopImageAsset.secureUrl}
-                          alt="Hero slide thumbnail"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-brand-muted">
-                          <ImageIcon className="w-4 h-4 opacity-50" />
+                    <div className="flex shrink-0 gap-2">
+                      <div className="w-24 h-14 bg-brand-surface-soft border border-brand-border rounded-md overflow-hidden shrink-0">
+                        {slide.desktopImageAsset?.secureUrl ? (
+                          <Image
+                            src={slide.desktopImageAsset.secureUrl}
+                            alt={`Desktop image for slide ${idx + 1}`}
+                            width={96}
+                            height={56}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-brand-muted">
+                            <ImageIcon className="w-4 h-4 opacity-50" />
+                          </div>
+                        )}
+                      </div>
+                      {slide.mobileImageAsset?.secureUrl && (
+                        <div
+                          className="h-14 w-11 overflow-hidden rounded-md border border-brand-border bg-brand-surface-soft"
+                          title="Mobile image configured"
+                        >
+                          <Image
+                            src={slide.mobileImageAsset.secureUrl}
+                            alt={`Mobile image for slide ${idx + 1}`}
+                            width={44}
+                            height={56}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
                       )}
                     </div>
@@ -381,19 +426,13 @@ export default function AdminStorefrontsPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
-                        <span className="text-[10px] font-bold text-brand-muted">#{idx + 1}</span>
+                        <span className="text-[11px] font-bold text-brand-muted">#{idx + 1}</span>
                         <h3 className="font-semibold text-xs text-brand-ink truncate">
                           {slide.heading || "Untitled Slide"}
                         </h3>
-                        <span
-                          className={`inline-block px-1.5 py-0.2 rounded-full text-[9px] font-semibold border ${
-                            slide.isActive
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-slate-100 text-slate-700 border-slate-300"
-                          }`}
-                        >
+                        <AdminBadge variant={slide.isActive ? "emerald" : "slate"}>
                           {slide.isActive ? "Active" : "Inactive"}
-                        </span>
+                        </AdminBadge>
                       </div>
                       {slide.text && (
                         <p className="text-[11px] text-brand-muted line-clamp-1 mt-0.5">
@@ -401,10 +440,17 @@ export default function AdminStorefrontsPage() {
                         </p>
                       )}
                       {slide.ctaLabel && (
-                        <span className="text-[10px] text-brand-primary font-medium mt-1 inline-block">
+                        <span className="text-[10px] text-brand-text font-medium mt-1 inline-block">
                           CTA: &quot;{slide.ctaLabel}&quot; → {slide.ctaLink || "#"}
                         </span>
                       )}
+                      <p className="mt-1 text-[10px] text-brand-muted">
+                        Desktop image ·{" "}
+                        {slide.mobileImageAsset
+                          ? "Mobile image configured"
+                          : "Desktop image used on mobile"}{" "}
+                        · Stored sort order {slide.sortOrder}
+                      </p>
                     </div>
 
                     {/* Action Controls */}
@@ -413,8 +459,9 @@ export default function AdminStorefrontsPage() {
                         type="button"
                         onClick={() => handleMoveSlide(idx, "up")}
                         disabled={idx === 0}
-                        className="p-1.5 border border-brand-sand rounded-sm hover:bg-brand-sand/30 disabled:opacity-30"
+                        className="p-1.5 border border-brand-border rounded-sm hover:bg-brand-surface-soft text-brand-ink disabled:opacity-30 transition-colors"
                         title="Move Up"
+                        aria-label="Move slide up"
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
                       </button>
@@ -422,8 +469,9 @@ export default function AdminStorefrontsPage() {
                         type="button"
                         onClick={() => handleMoveSlide(idx, "down")}
                         disabled={idx === slides.length - 1}
-                        className="p-1.5 border border-brand-sand rounded-sm hover:bg-brand-sand/30 disabled:opacity-30"
+                        className="p-1.5 border border-brand-border rounded-sm hover:bg-brand-surface-soft text-brand-ink disabled:opacity-30 transition-colors"
                         title="Move Down"
+                        aria-label="Move slide down"
                       >
                         <ArrowDown className="w-3.5 h-3.5" />
                       </button>
@@ -431,10 +479,10 @@ export default function AdminStorefrontsPage() {
                         type="button"
                         onClick={() => handleToggleActive(slide)}
                         disabled={isSaving}
-                        className={`px-2 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-sm border ${
+                        className={`px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold rounded-sm border transition-colors ${
                           slide.isActive
-                            ? "border-slate-300 text-slate-700 hover:bg-slate-100"
-                            : "border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                            ? "border-brand-border text-brand-text hover:bg-brand-surface-soft"
+                            : "border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
                         }`}
                       >
                         {slide.isActive ? "Deactivate" : "Activate"}
@@ -442,8 +490,9 @@ export default function AdminStorefrontsPage() {
                       <button
                         type="button"
                         onClick={() => handleOpenEditModal(slide)}
-                        className="p-1.5 border border-brand-sand rounded-sm hover:bg-brand-sand/30 text-brand-ink"
+                        className="p-1.5 border border-brand-border rounded-sm hover:bg-brand-surface-soft text-brand-ink transition-colors"
                         title="Edit Slide"
+                        aria-label="Edit hero slide"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -451,8 +500,9 @@ export default function AdminStorefrontsPage() {
                         type="button"
                         onClick={() => handleDeleteSlide(slide.id)}
                         disabled={isSaving}
-                        className="p-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-sm disabled:opacity-50"
+                        className="p-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-sm disabled:opacity-50 transition-colors"
                         title="Delete Slide"
+                        aria-label="Delete hero slide"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -461,157 +511,161 @@ export default function AdminStorefrontsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </AdminCard>
 
-          {/* Slide Modal (Create / Edit) */}
-          {isSlideModalOpen && (
-            <div
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="slide-modal-title"
-            >
-              <div className="bg-white rounded-sm shadow-xl border border-brand-sand max-w-lg w-full p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-brand-sand pb-3">
-                  <h3
-                    id="slide-modal-title"
-                    className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink"
-                  >
-                    {editingSlideId ? "Edit Hero Slide" : "New Hero Slide"}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsSlideModalOpen(false)}
-                    className="p-1 text-brand-muted hover:text-brand-ink"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSaveSlide} className="space-y-4 text-xs">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                      Heading *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={slideForm.heading}
-                      onChange={(e) => setSlideForm({ ...slideForm, heading: e.target.value })}
-                      placeholder="e.g. Pure Linen Summer Magic"
-                      className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                      Subtext / Supporting Text
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={slideForm.text}
-                      onChange={(e) => setSlideForm({ ...slideForm, text: e.target.value })}
-                      placeholder="e.g. Handcrafted festive wear designed for comfort"
-                      className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                        CTA Button Label
-                      </label>
-                      <input
-                        type="text"
-                        value={slideForm.ctaLabel}
-                        onChange={(e) => setSlideForm({ ...slideForm, ctaLabel: e.target.value })}
-                        placeholder="e.g. Shop Collection"
-                        className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                        CTA Link Path
-                      </label>
-                      <input
-                        type="text"
-                        value={slideForm.ctaLink}
-                        onChange={(e) => setSlideForm({ ...slideForm, ctaLink: e.target.value })}
-                        placeholder="e.g. /mini-sprouts/products"
-                        className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                      Desktop Media Asset ID (UUID) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={slideForm.desktopImageAssetId}
-                      onChange={(e) =>
-                        setSlideForm({ ...slideForm, desktopImageAssetId: e.target.value })
-                      }
-                      placeholder="e.g. c3923f03-62be-4977-b8db-4e78ea6e979f"
-                      className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                    />
-                    <span className="text-[10px] text-brand-muted mt-0.5 block">
-                      Target 1920×800 image uploaded via media service
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1">
-                      Mobile Media Asset ID (UUID, Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={slideForm.mobileImageAssetId}
-                      onChange={(e) =>
-                        setSlideForm({ ...slideForm, mobileImageAssetId: e.target.value })
-                      }
-                      placeholder="Optional target 1080×1350 mobile crop"
-                      className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink"
-                    />
-                  </div>
-
-                  <div className="pt-2">
-                    <label className="inline-flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={slideForm.isActive}
-                        onChange={(e) => setSlideForm({ ...slideForm, isActive: e.target.checked })}
-                        className="w-4 h-4 rounded text-brand-primary focus:ring-brand-primary border-brand-sand"
-                      />
-                      <span className="text-xs uppercase tracking-wider font-semibold text-brand-ink">
-                        Active &amp; Visible on Storefront
-                      </span>
-                    </label>
-                  </div>
-
-                  <div className="flex justify-end space-x-2 pt-3 border-t border-brand-sand">
-                    <button
-                      type="button"
-                      onClick={() => setIsSlideModalOpen(false)}
-                      className="px-3 py-1.5 border border-brand-sand rounded-sm text-brand-muted hover:text-brand-ink font-semibold uppercase tracking-wider"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSaving}
-                      className="inline-flex items-center space-x-1 px-4 py-1.5 bg-brand-primary text-white rounded-sm font-semibold uppercase tracking-wider shadow-xs hover:bg-brand-primary/90 disabled:opacity-50"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>{isSaving ? "Saving..." : "Save Slide"}</span>
-                    </button>
-                  </div>
-                </form>
+          {/* Slide Modal (Create / Edit) using AdminModal primitive */}
+          <AdminModal
+            isOpen={isSlideModalOpen}
+            onClose={() => setIsSlideModalOpen(false)}
+            title={editingSlideId ? "Edit Hero Slide" : "New Hero Slide"}
+            description="Configure promotional hero banner display and asset links"
+          >
+            <form onSubmit={handleSaveSlide} className="space-y-4 text-xs">
+              <div>
+                <label
+                  htmlFor="hero-heading"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
+                  Heading *
+                </label>
+                <input
+                  id="hero-heading"
+                  type="text"
+                  required
+                  value={slideForm.heading}
+                  onChange={(e) => setSlideForm({ ...slideForm, heading: e.target.value })}
+                  placeholder="e.g. Pure Linen Summer Magic"
+                  className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                />
               </div>
-            </div>
-          )}
+
+              <div>
+                <label
+                  htmlFor="hero-text"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
+                  Subtext / Supporting Text
+                </label>
+                <textarea
+                  id="hero-text"
+                  rows={2}
+                  value={slideForm.text}
+                  onChange={(e) => setSlideForm({ ...slideForm, text: e.target.value })}
+                  placeholder="e.g. Handcrafted festive wear designed for comfort"
+                  className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="hero-cta-label"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
+                    CTA Button Label
+                  </label>
+                  <input
+                    id="hero-cta-label"
+                    type="text"
+                    value={slideForm.ctaLabel}
+                    onChange={(e) => setSlideForm({ ...slideForm, ctaLabel: e.target.value })}
+                    placeholder="e.g. Shop Collection"
+                    className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="hero-cta-link"
+                    className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                  >
+                    CTA Link Path
+                  </label>
+                  <input
+                    id="hero-cta-link"
+                    type="text"
+                    value={slideForm.ctaLink}
+                    onChange={(e) => setSlideForm({ ...slideForm, ctaLink: e.target.value })}
+                    placeholder="e.g. /mini-sprouts/products"
+                    className="w-full px-3 py-1.5 bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="hero-desktop-asset"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
+                  Desktop Media Asset ID (UUID) *
+                </label>
+                <input
+                  id="hero-desktop-asset"
+                  type="text"
+                  required
+                  value={slideForm.desktopImageAssetId}
+                  onChange={(e) =>
+                    setSlideForm({ ...slideForm, desktopImageAssetId: e.target.value })
+                  }
+                  placeholder="e.g. c3923f03-62be-4977-b8db-4e78ea6e979f"
+                  className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                />
+                <span className="text-[10px] text-brand-muted mt-0.5 block">
+                  Target 1920×800 image uploaded via media service
+                </span>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="hero-mobile-asset"
+                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
+                >
+                  Mobile Media Asset ID (UUID, Optional)
+                </label>
+                <input
+                  id="hero-mobile-asset"
+                  type="text"
+                  value={slideForm.mobileImageAssetId}
+                  onChange={(e) =>
+                    setSlideForm({ ...slideForm, mobileImageAssetId: e.target.value })
+                  }
+                  placeholder="Optional target 1080×1350 mobile crop"
+                  className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="inline-flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={slideForm.isActive}
+                    onChange={(e) => setSlideForm({ ...slideForm, isActive: e.target.checked })}
+                    className="w-4 h-4 rounded text-brand-ink focus:ring-brand-ink border-brand-border"
+                  />
+                  <span className="text-xs uppercase tracking-wider font-semibold text-brand-ink">
+                    Active &amp; Visible on Storefront
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-brand-border">
+                <button
+                  type="button"
+                  onClick={() => setIsSlideModalOpen(false)}
+                  className="px-3 py-1.5 border border-brand-border rounded-sm text-brand-muted hover:text-brand-ink font-semibold uppercase tracking-wider transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm font-semibold uppercase tracking-wider text-xs shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>{isSaving ? "Saving..." : "Save Slide"}</span>
+                </button>
+              </div>
+            </form>
+          </AdminModal>
         </div>
       </AdminShell>
     </AdminGuard>

@@ -18,6 +18,7 @@ import {
 import { LoadingState, ErrorState, EmptyCartState } from "@/components/commerce/system-states";
 import { CheckoutCustomerForm } from "./checkout-customer-form";
 import { CheckoutPaymentSelection } from "./checkout-payment-selection";
+import { CheckoutPrimaryAction } from "./checkout-primary-action";
 import { CheckoutOrderSummary } from "./checkout-order-summary";
 import { CheckoutReviewView } from "./checkout-review-view";
 import {
@@ -485,17 +486,16 @@ export function CheckoutView() {
 
             {/* Action Button: Review Order */}
             <div className="space-y-2">
-              <button
+              <CheckoutPrimaryAction
                 type="submit"
                 disabled={isReviewing}
-                className="w-full min-h-[50px] px-6 py-3.5 rounded-xl font-sans text-sm font-semibold tracking-wide bg-ink text-white hover:bg-ink/90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 shadow-subtle cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <span>{isReviewing ? "Verifying with server..." : "Review Order"}</span>
                 {!isReviewing && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
-              </button>
+              </CheckoutPrimaryAction>
 
               <p className="text-[11px] font-sans text-center text-text-muted">
-                Your card or bank is not charged in this step. You will review verified totals next.
+                You will review your order before confirming it.
               </p>
             </div>
           </div>

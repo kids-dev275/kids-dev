@@ -5,8 +5,34 @@ export const uploadSignatureSchema = z
     mediaType: z.enum(["IMAGE", "VIDEO"], {
       errorMap: () => ({ message: "mediaType must be IMAGE or VIDEO" }),
     }),
+    videoCrop: z
+      .object({
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
   })
-  .strict("Unapproved fields are not allowed");
+  .strict("Unapproved fields are not allowed")
+  .superRefine(({ mediaType, videoCrop }, context) => {
+    if (mediaType === "VIDEO" && !videoCrop) {
+      context.addIssue({ code: "custom", message: "Video framing is required" });
+      return;
+    }
+    if (mediaType === "IMAGE" && videoCrop) {
+      context.addIssue({ code: "custom", message: "Video framing is only valid for videos" });
+      return;
+    }
+    if (
+      videoCrop &&
+      (videoCrop.width < 320 ||
+        videoCrop.height * 4 !== videoCrop.width * 5)
+    ) {
+      context.addIssue({ code: "custom", message: "Invalid 4:5 video framing" });
+    }
+  });
 
 export const registerProductMediaSchema = z
   .object({

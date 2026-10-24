@@ -89,6 +89,7 @@ export const listPublicReviewsQuerySchema = z
       .pipe(z.number().int().min(1).max(50)),
     productId: z.string().uuid("Invalid Product ID").optional(),
     storefrontSlug: z.string().min(1).max(100).optional(),
+    sort: z.enum(["newest", "rating"]).default("newest"),
   })
   .strict();
 

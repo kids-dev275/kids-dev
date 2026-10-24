@@ -158,7 +158,7 @@ export default function AccountOrderDetailPage() {
                 <span className="text-xs uppercase tracking-wider text-text-muted font-sans block">
                   Total Amount
                 </span>
-                <span className="font-sans font-bold text-2xl text-ink">
+                <span className="font-sans tabular-nums font-bold text-2xl text-ink">
                   {formatPrice(order.grandTotal)}
                 </span>
               </div>

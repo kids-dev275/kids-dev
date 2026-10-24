@@ -21,6 +21,7 @@ import {
   getAdminProductMedia,
   getAdminProductMediaUploadSignature,
   registerAdminProductMedia,
+  replaceAdminProductVideo,
   setAdminProductMediaMain,
   setAdminProductMediaHover,
   clearAdminProductMediaHover,
@@ -33,6 +34,19 @@ import {
   type AdminProductVariant,
   type AdminProductMedia,
 } from "@/lib/admin-api";
+import { ProductImageCropDialog } from "@/components/admin/product-image-crop-dialog";
+import { ProductVideoFrameDialog } from "@/components/admin/product-video-frame-dialog";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
+import {
+  getImageFormatError,
+  getImageSourceError,
+  getVideoFileError,
+  getVideoSourceError,
+  loadImage,
+  readVideoDimensions,
+  uploadSignedProductFile,
+  type VideoCrop,
+} from "@/lib/admin-product-media";
 import {
   ArrowLeft,
   Save,
@@ -62,11 +76,21 @@ export default function AdminProductEditorPage() {
   const [colors, setColors] = useState<AdminProductColor[]>([]);
   const [variants, setVariants] = useState<AdminProductVariant[]>([]);
   const [mediaList, setMediaList] = useState<AdminProductMedia[]>([]);
+  const [cropSource, setCropSource] = useState<{ url: string; name: string } | null>(null);
+  const [videoSource, setVideoSource] = useState<{
+    file: File;
+    url: string;
+    width: number;
+    height: number;
+    replace: boolean;
+  } | null>(null);
+  const imageMedia = mediaList.filter((media) => media.mediaType === "IMAGE");
+  const productVideo = mediaList.find((media) => media.mediaType === "VIDEO");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
 
   // New Size / Color form states
   const [newSizeName, setNewSizeName] = useState("");
@@ -347,7 +371,7 @@ export default function AdminProductEditorPage() {
         if (refreshed.success && refreshed.data) {
           setVariants(refreshed.data.variants);
         }
-        setSuccessMessage(`Successfully generated ${res.data.count} new variant(s).`);
+        setSuccessMessage(`Successfully generated ${res.data.variants.length} new variant(s).`);
       } else {
         setErrorMessage(res.error?.message || "Failed to generate variants.");
       }
@@ -439,7 +463,13 @@ export default function AdminProductEditorPage() {
   };
 
   const handleDeleteMedia = async (productMediaId: string) => {
-    if (!confirm("Are you sure you want to delete this media asset?")) return;
+    const target = mediaList.find((media) => media.id === productMediaId);
+    if (
+      !confirm(
+        target?.mediaType === "VIDEO" ? "Delete this product video?" : "Delete this product image?"
+      )
+    )
+      return;
     setIsSaving(true);
     try {
       const res = await deleteAdminProductMedia(productId, productMediaId);
@@ -456,94 +486,165 @@ export default function AdminProductEditorPage() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const closeCrop = () => {
+    if (cropSource) URL.revokeObjectURL(cropSource.url);
+    setCropSource(null);
+  };
+
+  const closeVideoFrame = () => {
+    if (videoSource) URL.revokeObjectURL(videoSource.url);
+    setVideoSource(null);
+  };
+
+  const handleImageSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    if (imageMedia.length >= 8) {
+      setErrorMessage("This product already has 8 images. Delete an image before adding another.");
+      return;
+    }
+    const formatError = getImageFormatError(file);
+    if (formatError) {
+      setErrorMessage(formatError);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const image = await loadImage(url);
+      const error = getImageSourceError(file, image.naturalWidth, image.naturalHeight);
+      if (error) throw new Error(error);
+      setCropSource({ url, name: file.name });
+    } catch (err) {
+      URL.revokeObjectURL(url);
+      setErrorMessage(err instanceof Error ? err.message : "Could not read the selected image.");
+    }
+  };
+
+  const uploadMedia = async (
+    file: File,
+    mediaType: "IMAGE" | "VIDEO",
+    replaceVideo = false,
+    videoCrop?: VideoCrop
+  ) => {
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      // 1. Request signed upload parameters
-      const signRes = await getAdminProductMediaUploadSignature(productId, "IMAGE");
+      const signRes = await getAdminProductMediaUploadSignature(productId, mediaType, videoCrop);
       if (!signRes.success || !signRes.data) {
-        setErrorMessage(signRes.error?.message || "Failed to obtain upload signature.");
-        setIsSaving(false);
-        return;
+        throw new Error(signRes.error?.message || "Failed to obtain upload signature.");
       }
 
       const signData = signRes.data;
+      const publicId = await uploadSignedProductFile(file, signData, mediaType);
 
-      // 2. Direct upload to Cloudinary (or mock provider in test)
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", signData.apiKey);
-      formData.append("timestamp", String(signData.timestamp));
-      formData.append("signature", signData.signature);
-      formData.append("folder", signData.folder);
-      formData.append("public_id", signData.publicId);
-
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${signData.cloudName}/image/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload image to media provider.");
-      }
-
-      const uploadJson = await uploadRes.json();
-      const publicId = uploadJson.public_id || signData.publicId;
-
-      // 3. Register uploaded media asset with backend
-      const regRes = await registerAdminProductMedia(productId, {
-        publicId,
-        mediaType: "IMAGE",
-        altText: `${product?.name || "Product"} image`,
-      });
+      const regRes = replaceVideo
+        ? await replaceAdminProductVideo(productId, publicId)
+        : await registerAdminProductMedia(productId, {
+            publicId,
+            mediaType,
+            ...(mediaType === "IMAGE" && { altText: `${product?.name || "Product"} image` }),
+          });
 
       if (regRes.success && regRes.data) {
         const newMedia = regRes.data.media;
-        setMediaList((prev) => [...prev, newMedia]);
-        setSuccessMessage("Product image uploaded successfully.");
+        setMediaList((prev) =>
+          replaceVideo
+            ? prev.map((media) => (media.id === newMedia.id ? newMedia : media))
+            : [...prev, newMedia]
+        );
+        setSuccessMessage(
+          replaceVideo
+            ? "Product video replaced successfully."
+            : `Product ${mediaType.toLowerCase()} uploaded successfully.`
+        );
       } else {
         setErrorMessage(regRes.error?.message || "Failed to register uploaded media.");
       }
     } catch (err: unknown) {
-      setErrorMessage((err as Error)?.message || "Network error uploading image.");
+      setErrorMessage(
+        (err as Error)?.message || `Network error uploading ${mediaType.toLowerCase()}.`
+      );
     } finally {
       setIsSaving(false);
-      e.target.value = "";
+    }
+  };
+
+  const handleVideoSelection = async (e: React.ChangeEvent<HTMLInputElement>, replace: boolean) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    if (productVideo && !replace) {
+      setErrorMessage("This product already has a product video. Replace or delete it first.");
+      return;
+    }
+    const formatError = getVideoFileError(file);
+    if (formatError) {
+      setErrorMessage(formatError);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const { width, height } = await readVideoDimensions(file);
+      const sourceError = getVideoSourceError(width, height);
+      if (sourceError) {
+        setErrorMessage(sourceError);
+        return;
+      }
+      setVideoSource({ file, url: URL.createObjectURL(file), width, height, replace });
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Could not read this MP4 video.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleMoveMedia = async (index: number, direction: "up" | "down") => {
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= mediaList.length) return;
+    if (targetIndex < 0 || targetIndex >= imageMedia.length) return;
 
-    const copy = [...mediaList];
+    const copy = [...imageMedia];
     const temp = copy[index];
     copy[index] = copy[targetIndex];
     copy[targetIndex] = temp;
-
-    const reorderPayload = copy.map((m, idx) => ({
-      productMediaId: m.id,
-      sortOrder: idx + 1,
-    }));
+    const ordered = [...copy, ...mediaList.filter((media) => media.mediaType === "VIDEO")];
 
     try {
-      const res = await reorderAdminProductMedia(productId, reorderPayload);
-      if (res.success) {
-        setMediaList(copy);
+      const res = await reorderAdminProductMedia(
+        productId,
+        ordered.map((media) => media.id)
+      );
+      if (res.success && res.data) {
+        setMediaList(res.data.media);
         setSuccessMessage("Media order updated.");
       } else {
         setErrorMessage(res.error?.message || "Failed to reorder media.");
       }
     } catch {
       setErrorMessage("Network error reordering media.");
+    }
+  };
+
+  const handleSaveMediaAlt = async (mediaId: string, altText: string) => {
+    const current = imageMedia.find((media) => media.id === mediaId);
+    if (!current || (current.altText || "") === altText.trim()) return;
+    try {
+      const res = await updateAdminProductMediaAlt(productId, mediaId, altText.trim() || null);
+      if (res.success && res.data) {
+        const updatedMedia = res.data.media;
+        setMediaList((prev) => prev.map((media) => (media.id === mediaId ? updatedMedia : media)));
+        setSuccessMessage("Image alt text saved.");
+      } else {
+        setErrorMessage(res.error?.message || "Failed to save image alt text.");
+      }
+    } catch {
+      setErrorMessage("Network error saving image alt text.");
     }
   };
 
@@ -671,7 +772,7 @@ export default function AdminProductEditorPage() {
 
           {successMessage && (
             <div
-              className="p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs"
+              className={`p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex items-start space-x-2 text-emerald-800 text-xs transition-opacity duration-300 ${successFading ? "opacity-0" : "opacity-100"}`}
               role="status"
             >
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -723,7 +824,7 @@ export default function AdminProductEditorPage() {
                   : "border-transparent text-brand-muted hover:text-brand-ink"
               }`}
             >
-              Media ({mediaList.length}/8)
+              Media ({imageMedia.length}/8 images)
             </button>
             <button
               type="button"
@@ -1002,9 +1103,9 @@ export default function AdminProductEditorPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex items-center space-x-2 px-5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm disabled:opacity-50 transition-colors shadow-xs"
+                  className="inline-flex items-center space-x-2 px-5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="w-4 h-4" aria-hidden="true" />
                   <span>{isSaving ? "Saving..." : "Save Product Details"}</span>
                 </button>
               </div>
@@ -1034,10 +1135,10 @@ export default function AdminProductEditorPage() {
                   />
                   <button
                     type="submit"
-                    disabled={isSaving}
-                    className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary rounded-sm disabled:opacity-50"
+                    disabled={isSaving || !newSizeName.trim()}
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Add</span>
                   </button>
                 </form>
@@ -1090,10 +1191,10 @@ export default function AdminProductEditorPage() {
                   />
                   <button
                     type="submit"
-                    disabled={isSaving}
-                    className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary rounded-sm disabled:opacity-50"
+                    disabled={isSaving || !newColorName.trim()}
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>Add</span>
                   </button>
                 </form>
@@ -1140,9 +1241,9 @@ export default function AdminProductEditorPage() {
                   type="button"
                   onClick={handleGenerateVariants}
                   disabled={isSaving || sizes.length === 0 || colors.length === 0}
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm disabled:opacity-50 transition-colors shadow-xs"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Generate All Combinations</span>
                 </button>
               </div>
@@ -1213,167 +1314,246 @@ export default function AdminProductEditorPage() {
 
           {/* TAB 4: MEDIA */}
           {activeTab === "media" && (
-            <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-4">
-              <div className="border-b border-brand-sand pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <>
+              <div className="bg-white p-6 border border-brand-sand rounded-sm shadow-xs space-y-6">
                 <div>
                   <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-brand-ink">
                     Product Media
                   </h2>
-                  <p className="text-[11px] text-brand-muted uppercase tracking-wider mt-0.5">
-                    Max 8 images (4:5 ratio) • Max 1 product video • One explicit Main Image
-                    required for publication
+                  <p className="mt-1 text-[11px] text-brand-muted">
+                    One explicit Main image is required for publication.
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm cursor-pointer disabled:opacity-50 transition-colors shadow-xs">
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Upload Image</span>
-                    <input
-                      type="file"
-                      id="product-media-upload-input"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={
-                        isSaving || mediaList.filter((m) => m.mediaType === "IMAGE").length >= 8
-                      }
-                      onChange={handleImageUpload}
-                    />
-                  </label>
-                  {mediaList.some((m) => m.isHover) && (
-                    <button
-                      type="button"
-                      onClick={handleClearHoverMedia}
-                      disabled={isSaving}
-                      className="px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-brand-muted hover:text-brand-ink border border-brand-sand rounded-sm"
-                    >
-                      Clear Hover Image
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {mediaList.length === 0 ? (
-                <div className="p-8 text-center text-brand-muted text-xs">
-                  <ImageIcon className="w-8 h-8 text-brand-muted mx-auto mb-2 opacity-50" />
-                  <p className="font-semibold uppercase tracking-wider">No media uploaded yet</p>
-                  <p className="text-[11px] mt-1 mb-4">
-                    Upload images using the Cloudinary signed media service.
-                  </p>
-                  <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm cursor-pointer disabled:opacity-50 transition-colors shadow-xs">
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Choose Image to Upload</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={isSaving}
-                      onChange={handleImageUpload}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {mediaList.map((media, idx) => (
-                    <div
-                      key={media.id}
-                      className="border border-brand-sand rounded-sm overflow-hidden bg-brand-canvas/30 flex flex-col"
-                    >
-                      <div className="aspect-4/5 relative bg-brand-sand/30 overflow-hidden">
-                        {media.mediaType === "IMAGE" ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={media.secureUrl}
-                            alt={media.altText || "Product media"}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-black/80 text-white p-4 text-center">
-                            <Video className="w-8 h-8 mb-2" />
-                            <span className="text-[10px] uppercase font-semibold">
-                              Product Video
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Badges */}
-                        <div className="absolute top-2 left-2 flex flex-col gap-1">
-                          {media.isMain && (
-                            <span className="bg-brand-primary text-white text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-xs shadow-xs">
-                              Main Image
-                            </span>
-                          )}
-                          {media.isHover && (
-                            <span className="bg-blue-600 text-white text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-xs shadow-xs">
-                              Hover Image
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Controls */}
-                      <div className="p-3 space-y-2 text-xs flex-1 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-[11px] text-brand-muted">
-                          <span>Order: #{idx + 1}</span>
-                          <div className="flex items-center space-x-1">
-                            <button
-                              type="button"
-                              onClick={() => handleMoveMedia(idx, "up")}
-                              disabled={idx === 0}
-                              className="p-1 hover:bg-brand-sand rounded disabled:opacity-30"
-                              title="Move up"
-                            >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMoveMedia(idx, "down")}
-                              disabled={idx === mediaList.length - 1}
-                              className="p-1 hover:bg-brand-sand rounded disabled:opacity-30"
-                              title="Move down"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1 pt-1 border-t border-brand-sand/60">
-                          {media.mediaType === "IMAGE" && !media.isMain && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetMainMedia(media.id)}
-                              disabled={isSaving}
-                              className="w-full py-1 text-[10px] uppercase tracking-wider font-semibold border border-brand-sand rounded-sm hover:bg-brand-sand/40 text-brand-ink"
-                            >
-                              Set as Main
-                            </button>
-                          )}
-                          {media.mediaType === "IMAGE" && !media.isHover && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetHoverMedia(media.id)}
-                              disabled={isSaving}
-                              className="w-full py-1 text-[10px] uppercase tracking-wider font-semibold border border-brand-sand rounded-sm hover:bg-brand-sand/40 text-brand-ink"
-                            >
-                              Set as Hover
-                            </button>
-                          )}
-                          {!media.isMain && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMedia(media.id)}
-                              disabled={isSaving}
-                              className="w-full py-1 text-[10px] uppercase tracking-wider font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-sm"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                <section aria-labelledby="product-images-heading">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-sand pb-3">
+                    <div>
+                      <h3
+                        id="product-images-heading"
+                        className="text-xs font-semibold uppercase tracking-wider text-brand-ink"
+                      >
+                        Images <span className="text-brand-muted">{imageMedia.length} / 8</span>
+                      </h3>
+                      <p className="mt-1 text-[11px] text-brand-muted">
+                        Final output: 1200 × 1500 · 4:5 · JPEG
+                      </p>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex flex-wrap gap-2">
+                      <label
+                        className={`inline-flex items-center gap-1.5 rounded-sm bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white focus-within:ring-2 focus-within:ring-brand-ink focus-within:ring-offset-2 ${isSaving || imageMedia.length >= 8 ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-brand-text"}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Upload Image
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          aria-label="Upload product image"
+                          className="sr-only"
+                          disabled={isSaving || imageMedia.length >= 8}
+                          onChange={handleImageSelection}
+                        />
+                      </label>
+                      {imageMedia.some((media) => media.isHover) && (
+                        <button
+                          type="button"
+                          onClick={handleClearHoverMedia}
+                          disabled={isSaving}
+                          className="rounded-sm border border-brand-sand px-3 py-2 text-xs font-semibold text-brand-ink disabled:opacity-50"
+                        >
+                          Clear Hover Image
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {imageMedia.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-brand-muted">
+                      <ImageIcon className="mx-auto mb-2 h-8 w-8" aria-hidden="true" />
+                      No product images yet. Select a source image to crop.
+                    </div>
+                  ) : (
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {imageMedia.map((media, idx) => (
+                        <div
+                          key={media.id}
+                          className="flex flex-col overflow-hidden rounded-sm border border-brand-sand bg-brand-canvas/30"
+                        >
+                          <div className="relative aspect-4/5 overflow-hidden bg-brand-sand/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={media.secureUrl}
+                              alt={media.altText || "Product image"}
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute left-2 top-2 flex flex-col gap-1">
+                              {media.isMain && (
+                                <span className="rounded-xs bg-brand-ink px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                  Main Image
+                                </span>
+                              )}
+                              {media.isHover && (
+                                <span className="rounded-xs bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                  Hover Image
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2 p-3 text-xs">
+                            <div className="flex items-center justify-between text-[11px] text-brand-muted">
+                              <span>Order: #{idx + 1}</span>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveMedia(idx, "up")}
+                                  disabled={isSaving || idx === 0}
+                                  aria-label={`Move image ${idx + 1} up`}
+                                  className="rounded p-1 hover:bg-brand-sand disabled:opacity-30"
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveMedia(idx, "down")}
+                                  disabled={isSaving || idx === imageMedia.length - 1}
+                                  aria-label={`Move image ${idx + 1} down`}
+                                  className="rounded p-1 hover:bg-brand-sand disabled:opacity-30"
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            <label className="block text-[11px] text-brand-muted">
+                              Alt text
+                              <input
+                                type="text"
+                                maxLength={200}
+                                defaultValue={media.altText || ""}
+                                onBlur={(event) =>
+                                  void handleSaveMediaAlt(media.id, event.target.value)
+                                }
+                                className="mt-1 w-full rounded-sm border border-brand-sand bg-white px-2 py-1 text-xs text-brand-ink"
+                              />
+                            </label>
+                            <div className="space-y-1 border-t border-brand-sand/60 pt-2">
+                              {!media.isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetMainMedia(media.id)}
+                                  disabled={isSaving}
+                                  className="w-full rounded-sm border border-brand-sand py-1 text-[10px] font-semibold uppercase text-brand-ink disabled:opacity-50"
+                                >
+                                  Set as Main
+                                </button>
+                              )}
+                              {!media.isHover && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetHoverMedia(media.id)}
+                                  disabled={isSaving}
+                                  className="w-full rounded-sm border border-brand-sand py-1 text-[10px] font-semibold uppercase text-brand-ink disabled:opacity-50"
+                                >
+                                  Set as Hover
+                                </button>
+                              )}
+                              {!media.isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMedia(media.id)}
+                                  disabled={isSaving}
+                                  className="w-full rounded-sm border border-rose-200 py-1 text-[10px] font-semibold uppercase text-rose-700 disabled:opacity-50"
+                                >
+                                  Delete Image
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  aria-labelledby="product-video-heading"
+                  className="border-t border-brand-sand pt-5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3
+                        id="product-video-heading"
+                        className="text-xs font-semibold uppercase tracking-wider text-brand-ink"
+                      >
+                        Product Video{" "}
+                        <span className="text-brand-muted">{productVideo ? 1 : 0} / 1</span>
+                      </h3>
+                      <p className="mt-1 text-[11px] text-brand-muted">
+                        Source: MP4 · choose a 4:5 frame · final output: 1080 × 1350
+                      </p>
+                    </div>
+                    <label
+                      className={`inline-flex items-center gap-1.5 rounded-sm bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white focus-within:ring-2 focus-within:ring-brand-ink focus-within:ring-offset-2 ${isSaving ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-brand-text"}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                      {productVideo ? "Replace Video" : "Upload Video"}
+                      <input
+                        type="file"
+                        accept=".mp4,video/mp4"
+                        aria-label={productVideo ? "Replace product video" : "Upload product video"}
+                        className="sr-only"
+                        disabled={isSaving}
+                        onChange={(event) => void handleVideoSelection(event, !!productVideo)}
+                      />
+                    </label>
+                  </div>
+                  {productVideo ? (
+                    <div className="mt-4 max-w-xs space-y-3">
+                      <video
+                        src={productVideo.secureUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        aria-label="Product video preview"
+                        className="aspect-4/5 w-full rounded-sm bg-black object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMedia(productVideo.id)}
+                        disabled={isSaving}
+                        className="rounded-sm border border-rose-200 px-3 py-2 text-xs font-semibold uppercase text-rose-700 disabled:opacity-50"
+                      >
+                        Delete Video
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-5 flex items-center gap-2 text-xs text-brand-muted">
+                      <Video className="h-4 w-4" aria-hidden="true" /> No product video uploaded.
+                    </p>
+                  )}
+                </section>
+              </div>
+              {cropSource && (
+                <ProductImageCropDialog
+                  sourceUrl={cropSource.url}
+                  sourceName={cropSource.name}
+                  onCancel={closeCrop}
+                  onConfirm={(file) => {
+                    closeCrop();
+                    void uploadMedia(file, "IMAGE");
+                  }}
+                />
               )}
-            </div>
+              {videoSource && (
+                <ProductVideoFrameDialog
+                  sourceUrl={videoSource.url}
+                  sourceWidth={videoSource.width}
+                  sourceHeight={videoSource.height}
+                  onCancel={closeVideoFrame}
+                  onConfirm={(crop) => {
+                    const { file, replace } = videoSource;
+                    closeVideoFrame();
+                    void uploadMedia(file, "VIDEO", replace, crop);
+                  }}
+                />
+              )}
+            </>
           )}
 
           {/* TAB 5: PUBLICATION STATUS */}

@@ -63,6 +63,7 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@kids-wear/shared"],
   images: {
+    qualities: [75, 90],
     remotePatterns: [
       {
         protocol: "https",

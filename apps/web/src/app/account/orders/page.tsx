@@ -167,7 +167,7 @@ function OrdersListContent() {
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-5">
-                      <span className="font-sans font-semibold text-base text-ink">
+                      <span className="font-sans tabular-nums font-semibold text-base text-ink">
                         {formatPrice(order.grandTotal)}
                       </span>
                       <div className="flex items-center gap-1 text-xs font-semibold text-accent-storefront">

@@ -5,6 +5,7 @@ import { Check, Minus, Plus, AlertCircle, ShoppingBag } from "lucide-react";
 import { OutOfStockState } from "@/components/commerce/system-states";
 import type { ApiProductOption, ApiProductVariant } from "@/lib/api";
 import { useCartStore } from "@/lib/cart-store";
+import { useTransientFeedback } from "@/lib/use-transient-feedback";
 
 export interface ProductPurchaseConfiguratorProps {
   productId?: string;
@@ -41,11 +42,11 @@ export function ProductPurchaseConfigurator({
     sizes.length === 1 ? sizes[0].id : null
   );
   const [quantity, setQuantity] = useState<number>(1);
-  const [feedback, setFeedback] = useState<{
+  const [feedback, setFeedback, feedbackFading] = useTransientFeedback<{
     key: string;
     type: "success" | "error";
     message: string;
-  } | null>(null);
+  }>();
 
   const addItem = useCartStore((state) => state.addItem);
 
@@ -244,7 +245,7 @@ export function ProductPurchaseConfigurator({
             </span>
           </legend>
 
-          <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Select Color">
+          <div className="flex flex-wrap gap-2.5" role="group" aria-label="Select Color">
             {colors.map((color) => {
               const isSelected = selectedColorId === color.id;
               const isAvailable = colorAvailabilityMap.get(color.id) ?? false;
@@ -254,18 +255,18 @@ export function ProductPurchaseConfigurator({
                   key={color.id}
                   type="button"
                   onClick={() => handleColorSelect(color.id)}
-                  aria-pressed={isSelected}
-                  disabled={!isAvailable && selectedSizeId !== null}
+                  aria-pressed={isSelected && isAvailable}
+                  disabled={!isAvailable}
                   className={`px-4 py-2 rounded-md text-xs font-sans font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront ${
-                    isSelected
-                      ? "bg-ink text-white border border-ink shadow-subtle"
-                      : isAvailable
-                        ? "bg-surface text-ink border border-border hover:border-accent-storefront"
-                        : "bg-surface-soft text-text-muted border border-border/60 opacity-50 cursor-not-allowed line-through"
+                    !isAvailable
+                      ? "bg-surface-soft text-text-muted border border-border/60 opacity-50 cursor-not-allowed line-through"
+                      : isSelected
+                        ? "bg-[var(--color-storefront-contrast)] text-white border border-[var(--color-storefront-contrast)] shadow-subtle font-bold"
+                        : "bg-[var(--color-storefront-accent-soft)] text-ink border border-border hover:border-[var(--color-storefront-contrast)]"
                   }`}
                 >
-                  <span>{color.name}</span>
-                  {!isAvailable && selectedSizeId !== null && (
+                  <span>{isSelected && isAvailable ? "✓ " : ""}{color.name}</span>
+                  {!isAvailable && (
                     <span className="sr-only"> (Unavailable)</span>
                   )}
                 </button>
@@ -287,7 +288,7 @@ export function ProductPurchaseConfigurator({
             </span>
           </legend>
 
-          <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Select Size">
+          <div className="flex flex-wrap gap-2.5" role="group" aria-label="Select Size">
             {sizes.map((size) => {
               const isSelected = selectedSizeId === size.id;
               const isAvailable = sizeAvailabilityMap.get(size.id) ?? false;
@@ -297,18 +298,18 @@ export function ProductPurchaseConfigurator({
                   key={size.id}
                   type="button"
                   onClick={() => handleSizeSelect(size.id)}
-                  aria-pressed={isSelected}
-                  disabled={!isAvailable && selectedColorId !== null}
+                  aria-pressed={isSelected && isAvailable}
+                  disabled={!isAvailable}
                   className={`min-w-[48px] px-3.5 py-2 rounded-md text-xs font-sans font-medium text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront ${
-                    isSelected
-                      ? "bg-ink text-white border border-ink shadow-subtle"
-                      : isAvailable
-                        ? "bg-surface text-ink border border-border hover:border-accent-storefront"
-                        : "bg-surface-soft text-text-muted border border-border/60 opacity-50 cursor-not-allowed line-through"
+                    !isAvailable
+                      ? "bg-surface-soft text-text-muted border border-border/60 opacity-50 cursor-not-allowed line-through"
+                      : isSelected
+                        ? "bg-[var(--color-storefront-contrast)] text-white border border-[var(--color-storefront-contrast)] shadow-subtle font-bold"
+                        : "bg-[var(--color-storefront-accent-soft)] text-ink border border-border hover:border-[var(--color-storefront-contrast)]"
                   }`}
                 >
-                  <span>{size.name}</span>
-                  {!isAvailable && selectedColorId !== null && (
+                  <span>{isSelected && isAvailable ? "✓ " : ""}{size.name}</span>
+                  {!isAvailable && (
                     <span className="sr-only"> (Unavailable)</span>
                   )}
                 </button>
@@ -324,7 +325,7 @@ export function ProductPurchaseConfigurator({
           {isPurchasable ? (
             <div className="inline-flex items-center gap-1.5 text-xs font-sans text-success">
               <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Available to order (Made-to-order)</span>
+              <span>Available to order</span>
             </div>
           ) : (
             <OutOfStockState message="This exact size and color combination is currently unavailable." />
@@ -395,7 +396,7 @@ export function ProductPurchaseConfigurator({
           disabled={!selectedVariant || !isPurchasable || quantity < 1 || quantity > 10}
           className={`w-full min-h-[48px] px-6 py-3 rounded-lg font-sans text-sm font-semibold tracking-wide transition-all duration-200 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 shadow-subtle ${
             selectedVariant && isPurchasable
-              ? "bg-ink text-white hover:bg-ink/90 active:scale-[0.99] cursor-pointer"
+              ? "bg-[var(--color-storefront-contrast)] text-white hover:bg-[var(--color-storefront-accent-hover)] active:scale-[0.99] cursor-pointer"
               : "bg-surface-soft text-text-muted border border-border cursor-not-allowed opacity-75"
           }`}
         >
@@ -414,7 +415,7 @@ export function ProductPurchaseConfigurator({
           <div
             role="status"
             aria-live="polite"
-            className={`p-3 rounded-md text-xs font-sans font-medium flex items-center gap-2 transition-all ${
+            className={`p-3 rounded-md text-xs font-sans font-medium flex items-center gap-2 transition-opacity duration-300 ${feedbackFading ? "opacity-0" : "opacity-100"} ${
               activeFeedback.type === "success"
                 ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
                 : "bg-red-50 text-red-800 border border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800"

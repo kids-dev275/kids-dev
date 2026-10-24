@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
 import { useFocusTrap } from "@/lib/use-focus-trap";
@@ -15,7 +16,6 @@ import {
   LogOut,
   Menu,
   X,
-  Shield,
 } from "lucide-react";
 
 interface AdminShellProps {
@@ -44,6 +44,7 @@ export function AdminShell({ children }: AdminShellProps) {
   const { admin, logout } = useAdminAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
   const handleCloseMobileMenu = () => {
@@ -71,8 +72,12 @@ export function AdminShell({ children }: AdminShellProps) {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await logout();
-      router.push("/admin/login");
+      setLogoutError(false);
+      if (await logout()) {
+        router.replace("/admin/login");
+      } else {
+        setLogoutError(true);
+      }
     } finally {
       setIsLoggingOut(false);
     }
@@ -90,24 +95,30 @@ export function AdminShell({ children }: AdminShellProps) {
       {/* Skip to Content Link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-ink focus:text-white focus:rounded focus:ring-2 focus:ring-offset-2 focus:ring-brand-ink"
       >
         Skip to main content
       </a>
 
       {/* Top Mobile Bar */}
-      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-brand-sand sticky top-0 z-30">
-        <div className="flex items-center space-x-2">
-          <Shield className="w-5 h-5 text-brand-primary" aria-hidden="true" />
-          <span className="font-heading tracking-wide text-sm font-semibold uppercase text-brand-ink">
-            Kids Wear Admin
+      <header className="lg:hidden flex items-center justify-between px-4 py-2.5 bg-white border-b border-brand-border sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <Image
+            src="/brand/kids-wear-logo.webp"
+            alt="Kids Wear"
+            width={55}
+            height={36}
+            className="h-auto w-[55px] object-contain"
+          />
+          <span className="border-l border-brand-border pl-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-muted">
+            Operations
           </span>
         </div>
         <button
           ref={mobileToggleRef}
           type="button"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-brand-ink hover:bg-brand-sand/50 rounded focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          className="p-2 text-brand-ink hover:bg-brand-surface-soft/60 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne"
           aria-expanded={mobileMenuOpen}
           aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
         >
@@ -118,24 +129,26 @@ export function AdminShell({ children }: AdminShellProps) {
       <div className="flex-1 flex">
         {/* Desktop Sidebar */}
         <aside
-          className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-brand-sand shrink-0 sticky top-0 h-screen"
+          className="hidden lg:flex lg:flex-col w-[264px] bg-[#fffdfb] border-r border-brand-border shrink-0 sticky top-0 h-screen shadow-[8px_0_30px_-26px_rgba(63,43,36,0.28)]"
           aria-label="Admin Sidebar"
         >
           {/* Logo Region */}
-          <div className="p-6 border-b border-brand-sand flex items-center space-x-3">
-            <Shield className="w-6 h-6 text-brand-primary" aria-hidden="true" />
-            <div>
-              <span className="font-heading tracking-wider text-base font-semibold uppercase text-brand-ink block">
-                Kids Wear
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-brand-muted font-medium block">
-                Operations Panel
-              </span>
-            </div>
+          <div className="px-6 py-5 border-b border-brand-border">
+            <Image
+              src="/brand/kids-wear-logo.webp"
+              alt="Kids Wear"
+              width={82}
+              height={54}
+              className="h-auto w-[82px] object-contain"
+              priority
+            />
+            <span className="mt-3 block text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-muted">
+              Operations Panel
+            </span>
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+          <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto" aria-label="Admin navigation">
             {NAV_ITEMS.map((item) => {
               const active = isCurrent(item);
               const Icon = item.icon;
@@ -144,13 +157,18 @@ export function AdminShell({ children }: AdminShellProps) {
                   key={item.name}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center space-x-3 px-3 py-2.5 rounded-sm text-xs uppercase tracking-wider font-medium transition-colors ${
+                  className={`group flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-semibold transition-colors border-l-[3px] focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-1 ${
                     active
-                      ? "bg-brand-primary text-white"
-                      : "text-brand-ink hover:bg-brand-sand/40 hover:text-brand-primary"
+                      ? "bg-brand-ink text-white border-champagne shadow-[0_7px_18px_-13px_rgba(63,43,36,0.7)]"
+                      : "text-brand-text hover:text-brand-ink hover:bg-brand-surface-soft border-transparent"
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <Icon
+                    className={`w-[17px] h-[17px] shrink-0 transition-colors ${
+                      active ? "text-champagne" : "text-brand-muted group-hover:text-brand-ink"
+                    }`}
+                    aria-hidden="true"
+                  />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -158,7 +176,7 @@ export function AdminShell({ children }: AdminShellProps) {
           </nav>
 
           {/* User & Logout Region */}
-          <div className="p-4 border-t border-brand-sand bg-brand-canvas/40">
+          <div className="p-4 border-t border-brand-border bg-brand-canvas/40">
             {admin?.email && (
               <div className="mb-3 px-2">
                 <span className="text-[10px] uppercase tracking-widest text-brand-muted block">
@@ -173,7 +191,7 @@ export function AdminShell({ children }: AdminShellProps) {
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-sm transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500 disabled:opacity-50"
+              className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50"
               aria-label="Sign out of Admin Panel"
             >
               <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
@@ -196,17 +214,23 @@ export function AdminShell({ children }: AdminShellProps) {
               className="w-4/5 max-w-xs bg-white h-full flex flex-col p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between pb-4 border-b border-brand-sand">
+              <div className="flex items-center justify-between pb-4 border-b border-brand-border">
                 <div className="flex items-center space-x-2">
-                  <Shield className="w-5 h-5 text-brand-primary" aria-hidden="true" />
-                  <span className="font-heading font-semibold text-sm tracking-wide uppercase text-brand-ink">
-                    Admin Menu
+                  <Image
+                    src="/brand/kids-wear-logo.webp"
+                    alt="Kids Wear"
+                    width={62}
+                    height={40}
+                    className="h-auto w-[62px] object-contain"
+                  />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brand-muted">
+                    Operations
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleCloseMobileMenu}
-                  className="p-1 text-brand-muted hover:text-brand-ink"
+                  className="p-1 text-brand-muted hover:text-brand-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne"
                   aria-label="Close menu"
                 >
                   <X className="w-5 h-5" />
@@ -223,20 +247,25 @@ export function AdminShell({ children }: AdminShellProps) {
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={`flex items-center space-x-3 px-3 py-2.5 rounded-sm text-xs uppercase tracking-wider font-medium ${
+                      className={`group flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-colors border-l-[3px] focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-1 ${
                         active
-                          ? "bg-brand-primary text-white"
-                          : "text-brand-ink hover:bg-brand-sand/40"
+                          ? "bg-brand-ink text-white border-champagne shadow-xs"
+                          : "text-brand-text hover:text-brand-ink hover:bg-brand-surface-soft/60 border-transparent"
                       }`}
                     >
-                      <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          active ? "text-champagne" : "text-brand-muted group-hover:text-brand-ink"
+                        }`}
+                        aria-hidden="true"
+                      />
                       <span>{item.name}</span>
                     </Link>
                   );
                 })}
               </nav>
 
-              <div className="pt-4 border-t border-brand-sand">
+              <div className="pt-4 border-t border-brand-border">
                 {admin?.email && (
                   <p className="text-[11px] text-brand-muted truncate mb-2">{admin.email}</p>
                 )}
@@ -247,7 +276,7 @@ export function AdminShell({ children }: AdminShellProps) {
                     void handleLogout();
                   }}
                   disabled={isLoggingOut}
-                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-sm"
+                  className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                 >
                   <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{isLoggingOut ? "Signing out..." : "Logout"}</span>
@@ -263,6 +292,14 @@ export function AdminShell({ children }: AdminShellProps) {
           id="main-content"
           className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"
         >
+          {logoutError && (
+            <p
+              role="alert"
+              className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+            >
+              Sign out could not be confirmed. Please try again.
+            </p>
+          )}
           {children}
         </main>
       </div>

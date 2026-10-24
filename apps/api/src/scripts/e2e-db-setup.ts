@@ -392,6 +392,85 @@ export async function setupE2eDatabase(): Promise<void> {
       },
     });
 
+    // 10. Published Product in Mini Sprouts: "Garden Bloom Romper"
+    const romperProduct = await prisma.product.create({
+      data: {
+        id: "30000000-0000-0000-0000-000000000004",
+        storefrontId: miniSprouts.id,
+        name: "Garden Bloom Romper",
+        slug: "garden-bloom-romper",
+        sku: "E2E-RMP-01",
+        description: "Delightful floral romper made with breathable soft cotton fabric.",
+        regularPrice: 2190.0,
+        status: "PUBLISHED",
+        isNewArrival: false,
+        fabric: "100% Breathable Cotton",
+      },
+    });
+
+    const romperSize03 = await prisma.productSize.create({
+      data: {
+        productId: romperProduct.id,
+        name: "0–3M",
+        sortOrder: 0,
+      },
+    });
+    const romperSize36 = await prisma.productSize.create({
+      data: {
+        productId: romperProduct.id,
+        name: "3–6M",
+        sortOrder: 1,
+      },
+    });
+
+    const romperColorCream = await prisma.productColor.create({
+      data: {
+        productId: romperProduct.id,
+        name: "Cream",
+      },
+    });
+    const romperColorPink = await prisma.productColor.create({
+      data: {
+        productId: romperProduct.id,
+        name: "Pink",
+      },
+    });
+
+    await prisma.productVariant.create({
+      data: {
+        productId: romperProduct.id,
+        productSizeId: romperSize03.id,
+        productColorId: romperColorCream.id,
+        isAvailable: true,
+      },
+    });
+    await prisma.productVariant.create({
+      data: {
+        productId: romperProduct.id,
+        productSizeId: romperSize36.id,
+        productColorId: romperColorCream.id,
+        isAvailable: true,
+      },
+    });
+    await prisma.productVariant.create({
+      data: {
+        productId: romperProduct.id,
+        productSizeId: romperSize03.id,
+        productColorId: romperColorPink.id,
+        isAvailable: true,
+      },
+    });
+
+    await prisma.productMedia.create({
+      data: {
+        productId: romperProduct.id,
+        mediaAssetId: mainMediaAsset.id,
+        isMain: true,
+        isHover: false,
+        sortOrder: 0,
+      },
+    });
+
     console.log("✅ E2E Database setup and seeding completed successfully.");
   } finally {
     await prisma.$disconnect();

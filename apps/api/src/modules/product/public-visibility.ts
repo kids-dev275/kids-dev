@@ -64,6 +64,11 @@ export interface PublicProductCard {
     url: string;
     altText: string | null;
   } | null;
+  quickAdd: {
+    colors: Array<{ id: string; name: string }>;
+    sizes: Array<{ id: string; name: string }>;
+    variants: Array<{ id: string; productSizeId: string; productColorId: string }>;
+  };
 }
 
 /**
@@ -84,9 +89,13 @@ export function formatPublicProductCard(product: {
       secureUrl: string;
     };
   }>;
+  sizes: Array<{ id: string; name: string; sortOrder: number }>;
+  colors: Array<{ id: string; name: string; sortOrder: number }>;
+  variants: Array<{ id: string; productSizeId: string; productColorId: string }>;
 }): PublicProductCard {
   const mainMedia = product.media.find((m) => m.isMain);
   const hoverMedia = product.media.find((m) => m.isHover);
+  const availableColorIds = new Set(product.variants.map((variant) => variant.productColorId));
 
   return {
     id: product.id,
@@ -107,6 +116,16 @@ export function formatPublicProductCard(product: {
           altText: hoverMedia.altText,
         }
       : null,
+    quickAdd: {
+      colors: product.colors
+        .filter((color) => availableColorIds.has(color.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+        .map(({ id, name }) => ({ id, name })),
+      sizes: [...product.sizes]
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+        .map(({ id, name }) => ({ id, name })),
+      variants: product.variants,
+    },
   };
 }
 

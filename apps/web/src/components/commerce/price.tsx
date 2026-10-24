@@ -57,7 +57,7 @@ export function Price({
 
   return (
     <span
-      className={`inline-flex items-baseline gap-2 font-sans select-none ${className}`.trim()}
+      className={`inline-flex items-baseline gap-2 font-sans tabular-nums select-none ${className}`.trim()}
       aria-label={
         isDiscounted
           ? `Current price: ${formattedPrice}, original price: ${formattedCompare}`

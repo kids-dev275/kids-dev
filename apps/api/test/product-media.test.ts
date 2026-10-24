@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { v2 as cloudinary } from "cloudinary";
 import { buildApp } from "../src/app";
 import { getPrismaClient } from "../src/lib/prisma";
 import {
@@ -8,6 +9,7 @@ import {
   UploadSignatureParams,
   UploadSignatureResult,
   CloudinaryResourceMetadata,
+  DefaultCloudinaryService,
 } from "../src/lib/cloudinary";
 import { hashPassword } from "../src/modules/admin-auth/services/password";
 import {
@@ -60,8 +62,10 @@ async function runTest(name: string, fn: () => Promise<void>): Promise<void> {
 class MockCloudinaryService implements ICloudinaryService {
   public mockResources: Map<string, CloudinaryResourceMetadata> = new Map();
   public failNextLookup = false;
+  public lastUploadSignatureParams: UploadSignatureParams | null = null;
 
   async createUploadSignature(params: UploadSignatureParams): Promise<UploadSignatureResult> {
+    this.lastUploadSignatureParams = params;
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = `kids-wear/products/${params.productId}`;
     const fileId = crypto.randomUUID();
@@ -76,6 +80,9 @@ class MockCloudinaryService implements ICloudinaryService {
       resourceType,
       folder,
       publicId,
+      ...(params.videoCrop && {
+        transformation: `c_crop,h_${params.videoCrop.height},w_${params.videoCrop.width},x_${params.videoCrop.x},y_${params.videoCrop.y}/c_scale,f_mp4,h_1350,w_1080`,
+      }),
     };
   }
 
@@ -327,7 +334,7 @@ async function runSuite(): Promise<void> {
         cookie: adminCookieHeader,
         "x-csrf-token": adminCsrf,
       },
-      payload: { mediaType: "VIDEO" },
+      payload: { mediaType: "VIDEO", videoCrop: { x: 0, y: 0, width: 1080, height: 1350 } },
     });
     assert(res.statusCode === 200, `Expected 200, got ${res.statusCode}`);
     const json = JSON.parse(res.body);
@@ -477,6 +484,82 @@ async function runSuite(): Promise<void> {
       assert(extraSigRes.statusCode === 400, `Expected 400, got ${extraSigRes.statusCode}`);
     }
   );
+
+  await runTest("video signature requires a valid source-space 4:5 crop", async () => {
+    const url = `/api/v1/admin/products/${prod1Id}/media/upload-signature`;
+    const headers = { cookie: adminCookieHeader, "x-csrf-token": adminCsrf };
+    const missing = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: { mediaType: "VIDEO" },
+    });
+    assert(missing.statusCode === 400, "Video framing must be required");
+    const invalid = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: { mediaType: "VIDEO", videoCrop: { x: 0, y: 0, width: 512, height: 512 } },
+    });
+    assert(invalid.statusCode === 400, "Wrong aspect ratio must be rejected");
+    const claimedDimensions = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: {
+        mediaType: "VIDEO",
+        videoCrop: { x: 0, y: 64, width: 512, height: 640, sourceWidth: 512 },
+      },
+    });
+    assert(claimedDimensions.statusCode === 400, "Client source dimensions must not be trusted");
+    const tooSmall = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: { mediaType: "VIDEO", videoCrop: { x: 0, y: 0, width: 316, height: 395 } },
+    });
+    assert(tooSmall.statusCode === 400, "Crops under the quality floor must be rejected");
+    const valid = await app.inject({
+      method: "POST",
+      url,
+      headers,
+      payload: { mediaType: "VIDEO", videoCrop: { x: 0, y: 64, width: 512, height: 640 } },
+    });
+    assert(valid.statusCode === 200, `Expected signed video upload, got ${valid.statusCode}`);
+    const signature = JSON.parse(valid.body).data;
+    assert(signature.resourceType === "video", "Must sign the video resource type");
+    assert(
+      signature.transformation === "c_crop,h_640,w_512,x_0,y_64/c_scale,f_mp4,h_1350,w_1080",
+      "Must preserve selected coordinates in signed transformation"
+    );
+    assert(
+      mockCloudinary.lastUploadSignatureParams?.videoCrop?.y === 64,
+      "Server must receive selected crop"
+    );
+  });
+
+  await runTest("production Cloudinary signature binds the video transformation", async () => {
+    const service = new DefaultCloudinaryService();
+    const result = await service.createUploadSignature({
+      productId: prod1Id,
+      mediaType: "VIDEO",
+      videoCrop: { x: 0, y: 64, width: 512, height: 640 },
+    });
+    assert(
+      result.transformation === "c_crop,h_640,w_512,x_0,y_64/c_scale,f_mp4,h_1350,w_1080",
+      "Transformation must crop then scale to canonical MP4"
+    );
+    const expected = cloudinary.utils.api_sign_request(
+      {
+        folder: result.folder,
+        public_id: result.publicId,
+        timestamp: result.timestamp,
+        transformation: result.transformation,
+      },
+      env.CLOUDINARY_API_SECRET || "development-api-secret"
+    );
+    assert(result.signature === expected, "Cloudinary signature must include the exact transformation");
+  });
 
   // ==========================================================================
   // PART C — CLOUDINARY VERIFICATION & REGISTRATION
@@ -898,6 +981,100 @@ async function runSuite(): Promise<void> {
       json.error.code === "PRODUCT_VIDEO_LIMIT_REACHED",
       `Expected PRODUCT_VIDEO_LIMIT_REACHED, got ${json.error.code}`
     );
+  });
+
+  await runTest("non-MP4 video metadata is rejected before registration", async () => {
+    const publicId = `kids-wear/products/${prod1Id}/video-webm`;
+    mockCloudinary.mockResources.set(publicId, {
+      publicId,
+      secureUrl: `https://res.cloudinary.com/test/video/upload/v1/${publicId}.webm`,
+      resourceType: "video",
+      format: "webm",
+      width: 1080,
+      height: 1350,
+      bytes: 600000,
+      duration: 10,
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/products/${prod1Id}/media`,
+      headers: { cookie: adminCookieHeader, "x-csrf-token": adminCsrf },
+      payload: { publicId, mediaType: "VIDEO" },
+    });
+    assert(res.statusCode === 400, `Expected 400, got ${res.statusCode}`);
+    assert(JSON.parse(res.body).error.code === "MEDIA_FORMAT_INVALID", "Must reject non-MP4");
+  });
+
+  await runTest("invalid replacement keeps the existing video", async () => {
+    const publicId = `kids-wear/products/${prod1Id}/replacement-invalid`;
+    mockCloudinary.mockResources.set(publicId, {
+      publicId,
+      secureUrl: `https://res.cloudinary.com/test/video/upload/v1/${publicId}.mp4`,
+      resourceType: "video",
+      format: "mp4",
+      width: 1920,
+      height: 1080,
+      bytes: 600000,
+      duration: 10,
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/products/${prod1Id}/media/replace-video`,
+      headers: { cookie: adminCookieHeader, "x-csrf-token": adminCsrf },
+      payload: { publicId, mediaType: "VIDEO" },
+    });
+    assert(res.statusCode === 400, `Expected 400, got ${res.statusCode}`);
+    const current = await prisma.productMedia.findUnique({
+      where: { id: vid1MediaId },
+      include: { mediaAsset: true },
+    });
+    assert(
+      current?.mediaAsset.providerPublicId === validVid1PublicId,
+      "Original video must remain"
+    );
+  });
+
+  await runTest("valid MP4 replacement swaps one video atomically", async () => {
+    const publicId = `kids-wear/products/${prod1Id}/replacement-valid`;
+    mockCloudinary.mockResources.set(publicId, {
+      publicId,
+      secureUrl: `https://res.cloudinary.com/test/video/upload/v1/${publicId}.mp4`,
+      resourceType: "video",
+      format: "mp4",
+      width: 1080,
+      height: 1350,
+      bytes: 900000,
+      duration: 14,
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/products/${prod1Id}/media/replace-video`,
+      headers: { cookie: adminCookieHeader, "x-csrf-token": adminCsrf },
+      payload: { publicId, mediaType: "VIDEO" },
+    });
+    assert(res.statusCode === 200, `Expected 200, got ${res.statusCode}`);
+    const media = JSON.parse(res.body).data.media;
+    assert(media.id === vid1MediaId, "Replacement must keep the product-media association");
+    assert(media.providerPublicId === publicId, "Replacement must reference the new MP4");
+    assert(media.isMain === false && media.isHover === false, "Video cannot gain image roles");
+    const count = await prisma.productMedia.count({
+      where: { productId: prod1Id, mediaAsset: { mediaType: "VIDEO" } },
+    });
+    assert(count === 1, `Exactly one video must remain, got ${count}`);
+  });
+
+  await runTest("video replacement requires Admin auth and CSRF", async () => {
+    const url = `/api/v1/admin/products/${prod1Id}/media/replace-video`;
+    const payload = { publicId: validVid1PublicId, mediaType: "VIDEO" };
+    const unauthenticated = await app.inject({ method: "POST", url, payload });
+    assert(unauthenticated.statusCode === 401, "Replacement must require Admin login");
+    const noCsrf = await app.inject({
+      method: "POST",
+      url,
+      payload,
+      headers: { cookie: adminCookieHeader },
+    });
+    assert(noCsrf.statusCode === 403, "Replacement must require Admin CSRF");
   });
 
   // 25. failed limit operation creates no partial association

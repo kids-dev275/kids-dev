@@ -1,5 +1,7 @@
 export type StorefrontSlug = "mini-sprouts" | "teen-studio" | "aura-studio";
 
+export const STOREFRONT_COOKIE = "kw_storefront";
+
 export interface StorefrontThemeMeta {
   slug: StorefrontSlug;
   name: string;

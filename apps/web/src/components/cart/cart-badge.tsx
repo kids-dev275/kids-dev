@@ -23,7 +23,7 @@ export function CartUnitBadge({ className = "" }: CartUnitBadgeProps) {
     <span
       data-testid="header-cart-badge"
       className={`absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent-storefront px-1 text-[10px] font-bold text-white leading-none shadow-xs transition-transform animate-in fade-in zoom-in-75 ${className}`.trim()}
-      aria-label={`${totalUnits} items in cart`}
+      aria-label={`${totalUnits} ${totalUnits === 1 ? "item" : "items"} in cart`}
     >
       {totalUnits > 99 ? "99+" : totalUnits}
     </span>

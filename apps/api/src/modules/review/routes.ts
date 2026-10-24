@@ -282,7 +282,7 @@ export const reviewRoutes: FastifyPluginAsync = async (app: FastifyInstance): Pr
       throw new BadRequestError(firstError, "VALIDATION_ERROR");
     }
 
-    const { page, limit, productId, storefrontSlug } = queryResult.data;
+    const { page, limit, productId, storefrontSlug, sort } = queryResult.data;
 
     // Public API STRICTLY queries APPROVED reviews whose product currently satisfies
     // the authoritative public product visibility contract.
@@ -331,7 +331,9 @@ export const reviewRoutes: FastifyPluginAsync = async (app: FastifyInstance): Pr
           },
         },
       },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy: sort === "rating"
+        ? [{ rating: "desc" }, { createdAt: "desc" }, { id: "desc" }]
+        : [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
     });

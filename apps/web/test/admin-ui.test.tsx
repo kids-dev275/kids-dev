@@ -2,10 +2,12 @@ import React from "react";
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
+import { runInNewContext } from "node:vm";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AdminGuard } from "../src/components/admin/admin-guard";
 import { AdminShell } from "../src/components/admin/admin-shell";
+import { ProductVideoFrameDialog } from "../src/components/admin/product-video-frame-dialog";
 import { AdminAuthProvider, useAdminAuth } from "../src/lib/admin-auth-context";
 import * as AdminApi from "../src/lib/admin-api";
 import {
@@ -198,8 +200,11 @@ async function runAdminUiTestSuite(): Promise<void> {
       const content = fs.readFileSync(loginFilePath, "utf8");
 
       assert(content.includes('type="email"'), "Must have email input");
-      assert(content.includes('type="password"'), "Must have password input");
-      assert(content.includes('autoComplete="email"'), "Must have autocomplete email");
+      assert(
+        content.includes('type={showPassword ? "text" : "password"}'),
+        "Must have password input with visibility control"
+      );
+      assert(content.includes('autoComplete="username"'), "Must have autocomplete username");
       assert(
         content.includes('autoComplete="current-password"'),
         "Must have autocomplete current-password"
@@ -258,19 +263,25 @@ async function runAdminUiTestSuite(): Promise<void> {
     }
   );
 
-  await runTest(
-    "5. AdminAuthProvider maintains in-memory session only and avoids persistent browser storage",
-    () => {
-      const authContextPath = path.join(__dirname, "../src/lib/admin-auth-context.tsx");
-      const content = fs.readFileSync(authContextPath, "utf8");
-      assert(!content.includes("localStorage"), "Must not use localStorage");
-      assert(!content.includes("sessionStorage"), "Must not use sessionStorage");
-      assert(
-        !content.includes("zustand"),
-        "Must not use zustand persistent store for admin session"
-      );
-    }
-  );
+  await runTest("5. AdminAuthProvider requires a non-secret current-tab marker", () => {
+    const authContextPath = path.join(__dirname, "../src/lib/admin-auth-context.tsx");
+    const content = fs.readFileSync(authContextPath, "utf8");
+    assert(!content.includes("localStorage"), "Must not use localStorage");
+    assert(content.includes('"kw_admin_tab_authenticated"'), "Must name the tab marker");
+    assert(
+      content.includes("sessionStorage.getItem(ADMIN_TAB_MARKER)"),
+      "Must require tab marker before session restoration"
+    );
+    assert(
+      content.includes('sessionStorage.setItem(ADMIN_TAB_MARKER, "true")'),
+      "Must set marker after login"
+    );
+    assert(
+      content.includes("sessionStorage.removeItem(ADMIN_TAB_MARKER)"),
+      "Must clear marker on logout or invalid session"
+    );
+    assert(!content.includes("zustand"), "Must not use zustand persistent store for admin session");
+  });
 
   await runTest(
     "6. Admin API client automatically handles CSRF token acquisition for mutation methods",
@@ -546,6 +557,41 @@ async function runAdminUiTestSuite(): Promise<void> {
     }
   );
 
+  await runTest("21a. Color Add follows the controlled color input", () => {
+    const editorPath = path.join(__dirname, "../src/app/admin/products/[productId]/page.tsx");
+    const content = fs.readFileSync(editorPath, "utf8");
+    const colorForm = content.match(/<form onSubmit=\{handleAddColor\}[\s\S]*?<\/form>/)?.[0];
+    assert(colorForm, "Color creation form must exist");
+    assert(colorForm.includes("value={newColorName}"), "Visible input must use color state");
+    assert(colorForm.includes("setNewColorName(e.target.value)"), "Typing must update color state");
+
+    const disabledExpression = colorForm.match(/disabled=\{([^}]+)\}/)?.[1];
+    assert(disabledExpression, "Color Add must have a disabled condition");
+    const isDisabled = (name: string, isSaving = false) =>
+      runInNewContext(disabledExpression, { newColorName: name, newSizeName: "", isSaving });
+
+    assert.strictEqual(isDisabled(""), true, "Empty color must disable Add");
+    assert.strictEqual(isDisabled("   "), true, "Whitespace-only color must disable Add");
+    assert.strictEqual(isDisabled("Cream"), false, "Cream must enable Add with Size input empty");
+    assert.strictEqual(isDisabled("Cream", true), true, "In-flight mutation must disable Add");
+
+    const colorHandler = content
+      .split("const handleAddColor = async")[1]
+      ?.split("const handleDeleteColor")[0];
+    assert(colorHandler, "Color Add handler must exist");
+    assert(colorHandler.includes("createAdminProductColor(productId"), "Must call Color API");
+    assert(
+      colorHandler.includes("name: newColorName.trim()"),
+      "Must submit the trimmed color name"
+    );
+    assert(
+      colorHandler.includes("setColors([...colors, res.data.color])"),
+      "Must update Colors from API response"
+    );
+    assert(colorHandler.includes('setNewColorName("")'), "Must clear input after success");
+    assert(colorHandler.includes("setErrorMessage(res.error?.message"), "Must show API rejection");
+  });
+
   await runTest(
     "22. product editor variants matrix manages exact Size + Color combinations with boolean availability",
     () => {
@@ -555,6 +601,10 @@ async function runAdminUiTestSuite(): Promise<void> {
       assert(
         content.includes("bulkCreateAdminProductVariants"),
         "Must support bulk variant creation"
+      );
+      assert(
+        content.includes("Successfully generated ${res.data.variants.length}"),
+        "Variant success feedback must count returned combinations"
       );
       assert(
         content.includes("updateAdminProductVariant"),
@@ -576,13 +626,39 @@ async function runAdminUiTestSuite(): Promise<void> {
       const editorPath = path.join(__dirname, "../src/app/admin/products/[productId]/page.tsx");
       const content = fs.readFileSync(editorPath, "utf8");
 
-      assert(content.includes("Max 8 images"), "Must mention max 8 images limit");
-      assert(content.includes("Max 1 product video"), "Must mention max 1 video limit");
+      assert(content.includes("imageMedia.length >= 8"), "Must disable image upload at 8 images");
+      assert(content.includes("productVideo ? 1 : 0"), "Must show the one-video count");
+      assert(content.includes('accept=".mp4,video/mp4"'), "Must offer a separate MP4 picker");
+      assert(
+        content.includes('accept="image/jpeg,image/png,image/webp"'),
+        "Image picker must stay image-only"
+      );
       assert(content.includes("setAdminProductMediaMain"), "Must support setting Main image");
       assert(content.includes("setAdminProductMediaHover"), "Must support setting Hover image");
       assert(content.includes("clearAdminProductMediaHover"), "Must support clearing Hover image");
     }
   );
+
+  await runTest("23a. video selection opens a dedicated 4:5 framing dialog before upload", () => {
+    const editorPath = path.join(__dirname, "../src/app/admin/products/[productId]/page.tsx");
+    const content = fs.readFileSync(editorPath, "utf8");
+    assert(content.includes("setVideoSource({ file, url:"), "Selection must open framing state");
+    assert(content.includes("<ProductVideoFrameDialog"), "Editor must render video framing dialog");
+    assert(content.includes("onCancel={closeVideoFrame}"), "Cancel must close without uploading");
+    const dialog = renderToStaticMarkup(
+      <ProductVideoFrameDialog
+        sourceUrl="blob:test-video"
+        sourceWidth={512}
+        sourceHeight={768}
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />
+    );
+    assert(dialog.includes("aspect-4/5"), "Video frame must be 4:5");
+    for (const label of ["Play Preview", "Zoom", "Reset", "Cancel", "Confirm Video"]) {
+      assert(dialog.includes(label), `Video framing must offer ${label}`);
+    }
+  });
 
   await runTest("24. product media prevents direct deletion of the Main Image", () => {
     const editorPath = path.join(__dirname, "../src/app/admin/products/[productId]/page.tsx");
@@ -819,8 +895,8 @@ async function runAdminUiTestSuite(): Promise<void> {
       const content = fs.readFileSync(sfPath, "utf8");
 
       assert(
-        content.includes("Architecture Invariant"),
-        "Must document fixed storefront architecture invariant"
+        content.includes("Storefront names and age ranges are fixed."),
+        "Must explain that storefront identities are fixed"
       );
       assert(!content.includes("Create Storefront"), "Must not allow storefront creation");
       assert(!content.includes("Delete Storefront"), "Must not allow storefront deletion");

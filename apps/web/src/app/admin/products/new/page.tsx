@@ -511,9 +511,9 @@ export default function AdminNewProductPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center space-x-2 px-5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm disabled:opacity-50 transition-colors shadow-xs"
+                className="inline-flex items-center space-x-2 px-5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-4 h-4" aria-hidden="true" />
                 <span>{isSubmitting ? "Creating..." : "Save Draft & Continue to Options"}</span>
               </button>
             </div>

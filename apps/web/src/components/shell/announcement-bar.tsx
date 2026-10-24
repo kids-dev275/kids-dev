@@ -6,13 +6,18 @@ import type { ApiAnnouncement } from "@/lib/api";
 export interface AnnouncementBarProps {
   announcement?: ApiAnnouncement | null;
   className?: string;
+  themed?: boolean;
 }
 
 /**
  * AnnouncementBar renders active global announcements from GET /api/v1/public/settings.
  * Strictly renders only when announcement.isActive === true and text is provided.
  */
-export function AnnouncementBar({ announcement, className = "" }: AnnouncementBarProps) {
+export function AnnouncementBar({
+  announcement,
+  className = "",
+  themed = false,
+}: AnnouncementBarProps) {
   if (!announcement || !announcement.isActive || !announcement.text?.trim()) {
     return null;
   }
@@ -30,7 +35,7 @@ export function AnnouncementBar({ announcement, className = "" }: AnnouncementBa
   return (
     <aside
       aria-label="Announcement"
-      className={`bg-ink text-white py-2 px-4 text-center text-xs font-sans font-medium transition-colors ${className}`.trim()}
+      className={`${themed ? "bg-[var(--color-storefront-contrast)]" : "bg-[var(--color-text-primary)]"} relative z-50 px-4 py-2 text-center font-sans text-xs font-medium text-white transition-colors ${className}`.trim()}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
         {link && isSafeLink ? (

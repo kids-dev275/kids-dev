@@ -2,18 +2,27 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { AdminGuard } from "@/components/admin/admin-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { getAdminProducts, type AdminProductListItem } from "@/lib/admin-api";
 import {
-  Plus,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
-  Package,
-} from "lucide-react";
+  AdminPageHeader,
+  AdminCard,
+  AdminFilterBar,
+  AdminTable,
+  AdminTableHeader,
+  AdminTableBody,
+  AdminTableRow,
+  AdminTableHead,
+  AdminTableCell,
+  AdminBadge,
+  AdminAlert,
+  AdminEmptyState,
+  AdminPagination,
+  getProductStatusBadgeVariant,
+} from "@/components/admin/admin-ui";
+import { getAdminProducts, type AdminProductListItem } from "@/lib/admin-api";
+import { Plus, Package } from "lucide-react";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<AdminProductListItem[]>([]);
@@ -82,78 +91,47 @@ export default function AdminProductsPage() {
     }
   };
 
-  const getStatusBadge = (prodStatus: string) => {
-    switch (prodStatus) {
-      case "PUBLISHED":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200";
-      case "DRAFT":
-        return "bg-amber-50 text-amber-700 border-amber-200";
-      case "INACTIVE":
-        return "bg-slate-100 text-slate-700 border-slate-300";
-      default:
-        return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
-
   return (
     <AdminGuard>
       <AdminShell>
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-brand-sand pb-4">
-            <div>
-              <h1 className="font-heading text-2xl font-bold tracking-tight text-brand-ink uppercase">
-                Products
-              </h1>
-              <p className="text-xs uppercase tracking-wider text-brand-muted mt-0.5">
-                Manage catalog, variants, pricing, and publication state
-              </p>
-            </div>
-            <Link
-              href="/admin/products/new"
-              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-primary hover:bg-brand-primary/90 rounded-sm transition-colors shadow-xs"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Product</span>
-            </Link>
-          </div>
+          <AdminPageHeader
+            title="Products"
+            eyebrow="Catalog Management"
+            description="Manage catalog, variants, pricing, and publication state"
+            action={
+              <Link
+                href="/admin/products/new"
+                className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-brand-ink hover:bg-brand-text active:bg-brand-ink/90 rounded-sm transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2"
+              >
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                <span>Create Product</span>
+              </Link>
+            }
+          />
 
-          {error && (
-            <div
-              className="p-4 bg-rose-50 border border-rose-200 rounded-sm flex items-start space-x-2 text-rose-800 text-xs"
-              role="alert"
-            >
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <AdminAlert type="error" message={error} onDismiss={() => setError(null)} />}
 
           {/* Filters Bar */}
-          <div className="bg-white p-4 border border-brand-sand rounded-sm shadow-xs flex flex-col md:flex-row gap-3">
-            {/* Search Input */}
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 text-brand-muted absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
-                }}
-                placeholder="Search by product name or SKU..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-primary"
-              />
-            </div>
-
+          <AdminFilterBar
+            search={search}
+            onSearchChange={(val) => {
+              setSearch(val);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            searchPlaceholder="Search by product name or SKU..."
+          >
             {/* Storefront Filter */}
             <div className="w-full md:w-48">
               <select
+                aria-label="Filter by storefront"
                 value={storefront}
                 onChange={(e) => {
                   setStorefront(e.target.value);
                   setPagination((prev) => ({ ...prev, page: 1 }));
                 }}
-                className="w-full px-3 py-1.5 text-xs bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                className="w-full px-3 py-1.5 text-xs bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
               >
                 <option value="">All Storefronts</option>
                 <option value="mini-sprouts">Mini Sprouts</option>
@@ -165,12 +143,13 @@ export default function AdminProductsPage() {
             {/* Status Filter */}
             <div className="w-full md:w-40">
               <select
+                aria-label="Filter by product status"
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value);
                   setPagination((prev) => ({ ...prev, page: 1 }));
                 }}
-                className="w-full px-3 py-1.5 text-xs bg-brand-canvas/30 border border-brand-sand rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                className="w-full px-3 py-1.5 text-xs bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
               >
                 <option value="">All Statuses</option>
                 <option value="DRAFT">Draft</option>
@@ -178,122 +157,124 @@ export default function AdminProductsPage() {
                 <option value="INACTIVE">Inactive</option>
               </select>
             </div>
-          </div>
+          </AdminFilterBar>
 
           {/* Table / List */}
-          <div className="bg-white border border-brand-sand rounded-sm shadow-xs overflow-hidden">
+          <AdminCard className="overflow-hidden">
             {isLoading ? (
               <div className="p-12 text-center text-xs uppercase tracking-wider text-brand-muted font-medium">
                 Loading products...
               </div>
-            ) : products.length === 0 ? (
-              <div className="p-12 text-center">
-                <Package className="w-8 h-8 text-brand-muted mx-auto mb-2 opacity-50" />
-                <p className="text-xs uppercase tracking-wider text-brand-muted font-semibold">
-                  No products found
-                </p>
-                <p className="text-[11px] text-brand-muted mt-1">
-                  Try adjusting your search or filters, or create a new product.
-                </p>
+            ) : error ? (
+              <div className="p-10 text-center text-sm text-rose-800">
+                Products could not be loaded. Try the filters again.
               </div>
+            ) : products.length === 0 ? (
+              <AdminEmptyState
+                icon={Package}
+                title={search || storefront || status ? "No matching products" : "No products yet"}
+                description={
+                  search || storefront || status
+                    ? "Try adjusting your search or filters."
+                    : "Create a product to begin building the catalog."
+                }
+              />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-brand-canvas/50 border-b border-brand-sand text-[11px] uppercase tracking-wider text-brand-muted font-semibold">
-                      <th className="py-3 px-4">Name / Title</th>
-                      <th className="py-3 px-4">SKU</th>
-                      <th className="py-3 px-4">Storefront</th>
-                      <th className="py-3 px-4">Price</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Arrival</th>
-                      <th className="py-3 px-4 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-brand-sand/60">
-                    {products.map((p) => (
-                      <tr key={p.id} className="hover:bg-brand-sand/20 transition-colors">
-                        <td className="py-3 px-4 font-medium text-brand-ink">
+              <AdminTable>
+                <AdminTableHeader>
+                  <tr>
+                    <AdminTableHead>Name / Title</AdminTableHead>
+                    <AdminTableHead>SKU</AdminTableHead>
+                    <AdminTableHead>Storefront</AdminTableHead>
+                    <AdminTableHead>Price</AdminTableHead>
+                    <AdminTableHead>Variants</AdminTableHead>
+                    <AdminTableHead>Status</AdminTableHead>
+                    <AdminTableHead>Arrival</AdminTableHead>
+                    <AdminTableHead align="center">Action</AdminTableHead>
+                  </tr>
+                </AdminTableHeader>
+                <AdminTableBody>
+                  {products.map((p) => (
+                    <AdminTableRow key={p.id}>
+                      <AdminTableCell className="font-medium text-brand-ink">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-brand-border bg-brand-surface-soft">
+                            {p.thumbnailUrl ? (
+                              <Image
+                                src={p.thumbnailUrl}
+                                alt=""
+                                width={44}
+                                height={44}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <Package className="h-4 w-4 text-brand-muted" aria-hidden="true" />
+                            )}
+                          </div>
                           <Link
                             href={`/admin/products/${p.id}`}
-                            className="hover:text-brand-primary font-semibold"
+                            className="hover:text-brand-text font-semibold hover:underline"
                           >
                             {p.name}
                           </Link>
-                        </td>
-                        <td className="py-3 px-4 font-mono text-brand-ink text-[11px]">{p.sku}</td>
-                        <td className="py-3 px-4 text-brand-muted">{p.storefront?.name || "—"}</td>
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="font-semibold text-brand-ink">PKR {p.regularPrice}</span>
-                          {p.compareAtPrice && (
-                            <span className="text-[10px] text-brand-muted line-through ml-1.5">
-                              PKR {p.compareAtPrice}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getStatusBadge(
-                              p.status
-                            )}`}
-                          >
-                            {p.status}
+                        </div>
+                      </AdminTableCell>
+                      <AdminTableCell className="font-mono text-brand-ink text-[11px] font-medium">
+                        {p.sku}
+                      </AdminTableCell>
+                      <AdminTableCell className="text-brand-muted font-medium">
+                        {p.storefront?.name || "—"}
+                      </AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap font-sans tabular-nums">
+                        <span className="font-semibold text-brand-ink">PKR {p.regularPrice}</span>
+                        {p.compareAtPrice && (
+                          <span className="text-[10px] text-brand-muted line-through ml-1.5">
+                            PKR {p.compareAtPrice}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          {p.isNewArrival ? (
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-primary bg-brand-primary/10 px-1.5 py-0.5 rounded-xs">
-                              New
-                            </span>
-                          ) : (
-                            <span className="text-brand-muted text-[10px]">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <Link
-                            href={`/admin/products/${p.id}`}
-                            className="inline-flex items-center px-2 py-1 text-[11px] uppercase tracking-wider font-semibold text-brand-primary hover:bg-brand-sand/40 border border-brand-sand rounded-sm"
-                          >
-                            Edit
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        )}
+                      </AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap text-brand-text">
+                        {p.variantCount === undefined
+                          ? "—"
+                          : `${p.availableVariantCount ?? 0} available / ${p.variantCount}`}
+                      </AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap">
+                        <AdminBadge variant={getProductStatusBadgeVariant(p.status)}>
+                          {p.status}
+                        </AdminBadge>
+                      </AdminTableCell>
+                      <AdminTableCell className="whitespace-nowrap">
+                        {p.isNewArrival ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-brand-ink bg-brand-surface-soft px-1.5 py-0.5 rounded-xs border border-brand-border/60">
+                            New
+                          </span>
+                        ) : (
+                          <span className="text-brand-muted text-[10px]">—</span>
+                        )}
+                      </AdminTableCell>
+                      <AdminTableCell align="center" className="whitespace-nowrap">
+                        <Link
+                          href={`/admin/products/${p.id}`}
+                          className="inline-flex items-center px-2.5 py-1 text-[11px] uppercase tracking-wider font-semibold text-brand-ink hover:bg-brand-surface-soft border border-brand-border rounded-sm transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
+                        >
+                          Edit
+                        </Link>
+                      </AdminTableCell>
+                    </AdminTableRow>
+                  ))}
+                </AdminTableBody>
+              </AdminTable>
             )}
 
             {/* Pagination Controls */}
-            {pagination.totalPages > 1 && (
-              <div className="p-4 border-t border-brand-sand flex items-center justify-between text-xs text-brand-muted">
-                <span>
-                  Showing Page {pagination.page} of {pagination.totalPages} ({pagination.total}{" "}
-                  total products)
-                </span>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page <= 1}
-                    className="p-1 border border-brand-sand rounded-sm hover:bg-brand-sand/30 disabled:opacity-40"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.totalPages}
-                    className="p-1 border border-brand-sand rounded-sm hover:bg-brand-sand/30 disabled:opacity-40"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            <AdminPagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemName="products"
+              onPageChange={handlePageChange}
+            />
+          </AdminCard>
         </div>
       </AdminShell>
     </AdminGuard>
