@@ -67,17 +67,49 @@ export async function uploadHeroImage(
 ) {
   const preparedFile = await prepareHeroImage(file, placement);
 
-  const signature = await getAdminHeroUploadSignature(storefrontId, placement);
-  if (!signature.success || !signature.data) {
-    throw new Error(signature.error?.message || "Could not prepare hero image upload.");
+  return registerPreparedHeroImage(storefrontId, placement, preparedFile);
+}
+
+type HeroUploadDependencies = {
+  getSignature: typeof getAdminHeroUploadSignature;
+  uploadSigned: typeof uploadSignedProductFile;
+  register: typeof registerAdminHeroImage;
+};
+
+export async function registerPreparedHeroImage(
+  storefrontId: string,
+  placement: HeroPlacement,
+  preparedFile: File,
+  dependencies: HeroUploadDependencies = {
+    getSignature: getAdminHeroUploadSignature,
+    uploadSigned: uploadSignedProductFile,
+    register: registerAdminHeroImage,
   }
-  const publicId = await uploadSignedProductFile(preparedFile, signature.data, "IMAGE");
+) {
+  const signature = await dependencies.getSignature(storefrontId, placement);
+  if (!signature.success || !signature.data) {
+    throw new Error(signature.error?.code === "NETWORK_ERROR"
+      ? "Could not request the hero image upload. Please try again."
+      : signature.error?.message || "Could not prepare hero image upload.");
+  }
+
+  let publicId: string;
+  try {
+    publicId = await dependencies.uploadSigned(preparedFile, signature.data, "IMAGE");
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw new Error(error instanceof TypeError
+      ? "Hero image upload to the media provider failed. Please try again."
+      : error instanceof Error ? error.message : "Hero image upload failed. Please try again.");
+  }
   if (publicId !== `${signature.data.folder}/${signature.data.publicId}`) {
     throw new Error("The media provider returned an unexpected image ID.");
   }
-  const registration = await registerAdminHeroImage(storefrontId, { placement, publicId });
+  const registration = await dependencies.register(storefrontId, { placement, publicId });
   if (!registration.success || !registration.data) {
-    throw new Error(registration.error?.message || "Could not register hero image.");
+    throw new Error(registration.error?.code === "NETWORK_ERROR"
+      ? "Could not confirm hero image registration. Check the connection before uploading again."
+      : registration.error?.message || "Could not register hero image.");
   }
   return registration.data.mediaAsset;
 }

@@ -920,9 +920,12 @@ async function runAdminUiTestSuite(): Promise<void> {
     () => {
       const sfPath = path.join(__dirname, "../src/app/admin/storefronts/page.tsx");
       const content = fs.readFileSync(sfPath, "utf8");
+      const savePath = path.join(__dirname, "../src/lib/admin-hero-request-state.ts");
+      const saveContent = fs.readFileSync(savePath, "utf8");
 
-      assert(content.includes("createAdminHeroSlide"), "Must call createAdminHeroSlide helper");
-      assert(content.includes("updateAdminHeroSlide"), "Must call updateAdminHeroSlide helper");
+      assert(content.includes("saveHeroSlideOnce"), "Must use the single save request helper");
+      assert(saveContent.includes("createAdminHeroSlide"), "Must support creating a hero slide");
+      assert(saveContent.includes("updateAdminHeroSlide"), "Must support editing a hero slide");
     }
   );
 

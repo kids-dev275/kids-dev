@@ -18,7 +18,6 @@ import {
 import {
   getAdminStorefronts,
   getAdminStorefrontHeroSlides,
-  createAdminHeroSlide,
   updateAdminHeroSlide,
   deleteAdminHeroSlide,
   reorderAdminHeroSlides,
@@ -27,6 +26,7 @@ import {
   type AdminHeroSlide,
 } from "@/lib/admin-api";
 import { uploadHeroImage, type HeroPlacement } from "@/lib/admin-hero-media";
+import { isAbortedAdminRequest, saveHeroSlideOnce, upsertHeroSlide } from "@/lib/admin-hero-request-state";
 import {
   Store,
   Plus,
@@ -52,7 +52,9 @@ export default function AdminStorefrontsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
   const [slidesLoadFailed, setSlidesLoadFailed] = useState(false);
   const slideRequestId = useRef(0);
@@ -107,29 +109,41 @@ export default function AdminStorefrontsPage() {
   }, []);
 
   // Fetch Hero slides when selected storefront changes
-  const fetchSlides = useCallback(async () => {
+  const fetchSlides = useCallback(async (mode: "load" | "refresh" = "load") => {
     if (!selectedStorefrontId) return;
     const requestId = ++slideRequestId.current;
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSlidesLoadFailed(false);
-    setSlides([]);
+    if (mode === "load") {
+      setIsLoading(true);
+      setErrorMessage(null);
+      setSlidesLoadFailed(false);
+    } else {
+      setIsLoading(false);
+      setRefreshError(null);
+    }
     try {
       const res = await getAdminStorefrontHeroSlides(selectedStorefrontId);
       if (requestId !== slideRequestId.current) return;
       if (res.success && res.data) {
         setSlides(res.data.heroSlides);
-      } else {
-        setSlidesLoadFailed(true);
-        setErrorMessage(res.error?.message || "Failed to load hero slides.");
+        setSlidesLoadFailed(false);
+        setRefreshError(null);
+      } else if (!isAbortedAdminRequest(res.error)) {
+        if (mode === "refresh") {
+          setRefreshError("The latest hero slides could not be refreshed. The current list is retained.");
+        } else {
+          setSlidesLoadFailed(true);
+        }
       }
-    } catch {
-      if (requestId === slideRequestId.current) {
-        setSlidesLoadFailed(true);
-        setErrorMessage("Network error loading hero slides.");
+    } catch (error) {
+      if (requestId === slideRequestId.current && !isAbortedAdminRequest(error)) {
+        if (mode === "refresh") {
+          setRefreshError("The latest hero slides could not be refreshed. The current list is retained.");
+        } else {
+          setSlidesLoadFailed(true);
+        }
       }
     } finally {
-      if (requestId === slideRequestId.current) setIsLoading(false);
+      if (requestId === slideRequestId.current && mode === "load") setIsLoading(false);
     }
   }, [selectedStorefrontId]);
 
@@ -143,6 +157,7 @@ export default function AdminStorefrontsPage() {
     void load();
     return () => {
       isMounted = false;
+      slideRequestId.current += 1;
     };
   }, [fetchSlides]);
 
@@ -158,7 +173,8 @@ export default function AdminStorefrontsPage() {
       isActive: true,
     });
     setHeroPreviews({ desktop: null, mobile: null });
-    setModalError(null);
+    setUploadError(null);
+    setSaveError(null);
     setIsSlideModalOpen(true);
   };
 
@@ -177,7 +193,8 @@ export default function AdminStorefrontsPage() {
       desktop: existingPreview(slide.desktopImageAsset),
       mobile: existingPreview(slide.mobileImageAsset),
     });
-    setModalError(null);
+    setUploadError(null);
+    setSaveError(null);
     setIsSlideModalOpen(true);
   };
 
@@ -189,7 +206,7 @@ export default function AdminStorefrontsPage() {
     event.target.value = "";
     if (!file || !selectedStorefrontId || uploadingPlacement) return;
     setUploadingPlacement(placement);
-    setModalError(null);
+    setUploadError(null);
     try {
       const asset = await uploadHeroImage(selectedStorefrontId, placement, file);
       setHeroPreviews((current) => ({ ...current, [placement]: { ...asset, filename: file.name } }));
@@ -197,8 +214,14 @@ export default function AdminStorefrontsPage() {
         ...current,
         [placement === "desktop" ? "desktopImageAssetId" : "mobileImageAssetId"]: asset.id,
       }));
+      setSaveError(null);
     } catch (error) {
-      setModalError(error instanceof Error ? error.message : "Hero image upload failed.");
+      if (!isAbortedAdminRequest(error)) {
+        const message = error instanceof Error ? error.message : "";
+        setUploadError(message && message !== "Failed to fetch"
+          ? message
+          : "Hero image upload failed. Please try again.");
+      }
     } finally {
       setUploadingPlacement(null);
     }
@@ -216,11 +239,11 @@ export default function AdminStorefrontsPage() {
     e.preventDefault();
     if (!selectedStorefrontId || uploadingPlacement || isSaving) return;
     if (!slideForm.desktopImageAssetId) {
-      setModalError("Upload a desktop hero image before saving the slide.");
+      setSaveError("Upload a desktop hero image before saving the slide.");
       return;
     }
     setIsSaving(true);
-    setModalError(null);
+    setSaveError(null);
     setSuccessMessage(null);
 
     try {
@@ -234,27 +257,28 @@ export default function AdminStorefrontsPage() {
         isActive: slideForm.isActive,
       };
 
-      if (editingSlideId) {
-        const res = await updateAdminHeroSlide(selectedStorefrontId, editingSlideId, payload);
-        if (res.success) {
-          setSuccessMessage("Hero slide updated successfully.");
-          setIsSlideModalOpen(false);
-          await fetchSlides();
+      const res = await saveHeroSlideOnce(selectedStorefrontId, editingSlideId, payload);
+      if (res.success) {
+        slideRequestId.current += 1;
+        if (res.data?.heroSlide) {
+          const savedSlide = res.data.heroSlide;
+          setSlides((current) => upsertHeroSlide(current, savedSlide));
         } else {
-          setModalError(res.error?.message || "Failed to update hero slide.");
+          void fetchSlides("refresh");
         }
-      } else {
-        const res = await createAdminHeroSlide(selectedStorefrontId, payload);
-        if (res.success) {
-          setSuccessMessage("Hero slide created successfully.");
-          setIsSlideModalOpen(false);
-          await fetchSlides();
-        } else {
-          setModalError(res.error?.message || "Failed to create hero slide.");
-        }
+        setIsLoading(false);
+        setSlidesLoadFailed(false);
+        setErrorMessage(null);
+        setRefreshError(null);
+        setSuccessMessage(editingSlideId ? "Hero slide updated successfully." : "Hero slide created successfully.");
+        setIsSlideModalOpen(false);
+      } else if (!isAbortedAdminRequest(res.error)) {
+        setSaveError(res.error?.code === "NETWORK_ERROR"
+          ? "Could not confirm whether the hero slide was saved. Refresh the list before trying again."
+          : res.error?.message || "Could not save the hero slide. Please check its details and try again.");
       }
-    } catch {
-      setModalError("Network error saving hero slide.");
+    } catch (error) {
+      if (!isAbortedAdminRequest(error)) setSaveError("Could not confirm whether the hero slide was saved. Refresh the list before trying again.");
     } finally {
       setIsSaving(false);
     }
@@ -274,7 +298,7 @@ export default function AdminStorefrontsPage() {
       const res = await deleteAdminHeroSlide(selectedStorefrontId, slideId);
       if (res.success) {
         setSuccessMessage("Hero slide deleted successfully.");
-        await fetchSlides();
+        await fetchSlides("refresh");
       } else {
         setErrorMessage(res.error?.message || "Failed to delete hero slide.");
       }
@@ -292,7 +316,7 @@ export default function AdminStorefrontsPage() {
         isActive: !slide.isActive,
       });
       if (res.success) {
-        await fetchSlides();
+        await fetchSlides("refresh");
         setSuccessMessage(`Slide marked as ${!slide.isActive ? "Active" : "Inactive"}.`);
       } else {
         setErrorMessage(res.error?.message || "Failed to update slide status.");
@@ -318,7 +342,7 @@ export default function AdminStorefrontsPage() {
     try {
       const res = await reorderAdminHeroSlides(selectedStorefrontId, slideIds);
       if (res.success) {
-        await fetchSlides();
+        await fetchSlides("refresh");
         setSuccessMessage("Hero slides reordered successfully.");
       } else {
         setErrorMessage(res.error?.message || "Failed to reorder hero slides.");
@@ -368,6 +392,14 @@ export default function AdminStorefrontsPage() {
               onDismiss={() => setSuccessMessage(null)}
             />
           )}
+          {refreshError && (
+            <div role="status" className="flex items-center justify-between gap-3 rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+              <span>{refreshError}</span>
+              <button type="button" onClick={() => void fetchSlides("refresh")} className="shrink-0 font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-800">
+                Retry refresh
+              </button>
+            </div>
+          )}
 
           {/* Fixed Storefronts Selector */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -378,11 +410,15 @@ export default function AdminStorefrontsPage() {
                   key={sf.id}
                   type="button"
                   onClick={() => {
+                    slideRequestId.current += 1;
                     setSelectedStorefrontId(sf.id);
                     setSlides([]);
+                    setRefreshError(null);
+                    setErrorMessage(null);
                     setIsLoading(true);
                   }}
-                  className={`p-4 border text-left rounded-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne ${
+                  disabled={!!uploadingPlacement || isSaving}
+                  className={`p-4 border text-left rounded-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-champagne disabled:cursor-not-allowed disabled:opacity-60 ${
                     isSelected
                       ? "border-champagne bg-brand-surface-soft/80 shadow-xs ring-1 ring-champagne"
                       : "border-brand-border bg-white hover:bg-brand-surface-soft/40"
@@ -430,7 +466,10 @@ export default function AdminStorefrontsPage() {
               </div>
             ) : slidesLoadFailed ? (
               <div className="p-8 text-center text-sm text-rose-800">
-                Hero slides could not be loaded. Retry before editing.
+                Hero slides could not be loaded. {" "}
+                <button type="button" onClick={() => void fetchSlides()} className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-800">
+                  Retry
+                </button>
               </div>
             ) : slides.length === 0 ? (
               <div className="p-8 text-center text-sm text-brand-muted">
@@ -580,8 +619,18 @@ export default function AdminStorefrontsPage() {
             description="Configure promotional hero banner display and images"
           >
             <form onSubmit={handleSaveSlide} className="space-y-4 text-xs">
-              {modalError && (
-                <AdminAlert type="error" message={modalError} onDismiss={() => setModalError(null)} />
+              {uploadError && (
+                <AdminAlert type="error" message={uploadError} onDismiss={() => setUploadError(null)} />
+              )}
+              {saveError && (
+                <div className="space-y-2">
+                  <AdminAlert type="error" message={saveError} onDismiss={() => setSaveError(null)} />
+                  {saveError.includes("Could not confirm") && (
+                    <button type="button" onClick={() => void fetchSlides("refresh")} className="font-semibold text-brand-ink underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink">
+                      Refresh slide list
+                    </button>
+                  )}
+                </div>
               )}
               <div>
                 <label

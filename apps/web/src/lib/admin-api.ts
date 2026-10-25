@@ -278,6 +278,12 @@ async function adminFetch<T>(
 
     return json;
   } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return {
+        success: false,
+        error: { code: "REQUEST_ABORTED", message: "Request cancelled." },
+      };
+    }
     const message = err instanceof Error ? err.message : "Network error";
     return {
       success: false,
