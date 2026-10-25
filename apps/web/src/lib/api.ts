@@ -90,22 +90,28 @@ export interface ApiProductsResponse {
  */
 export function getApiBaseUrl(): string {
   const isServer = typeof window === "undefined";
-  const isProduction = process.env.NODE_ENV === "production";
+  const isDeployed =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL === "1" ||
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.APP_ENV === "staging" ||
+    process.env.NEXT_PUBLIC_APP_ENV === "staging";
 
   let rawUrl: string | undefined;
   if (isServer && process.env.INTERNAL_API_URL) {
     rawUrl = process.env.INTERNAL_API_URL;
   } else if (process.env.NEXT_PUBLIC_API_URL) {
     rawUrl = process.env.NEXT_PUBLIC_API_URL;
-  } else if (!isProduction) {
+  } else if (!isDeployed) {
     rawUrl = "http://localhost:4000/api/v1";
   }
 
   if (!rawUrl) {
     console.error(
-      "[Config Error] Neither INTERNAL_API_URL nor NEXT_PUBLIC_API_URL is configured in production environment."
+      "[Config Error] Neither INTERNAL_API_URL nor NEXT_PUBLIC_API_URL is configured for the deployed environment."
     );
-    throw new Error("Backend API base URL is not configured in production environment.");
+    throw new Error("Backend API base URL is not configured for the deployed environment.");
   }
 
   try {
@@ -113,11 +119,32 @@ export function getApiBaseUrl(): string {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       throw new Error(`Invalid URL protocol: ${parsed.protocol}`);
     }
+    if (
+      isDeployed &&
+      (parsed.hostname === "localhost" ||
+        parsed.hostname.endsWith(".localhost") ||
+        parsed.hostname.startsWith("127.") ||
+        parsed.hostname === "[::1]")
+    ) {
+      throw new Error("Deployed API URL points to a loopback host");
+    }
     return rawUrl.replace(/\/$/, "");
   } catch (err) {
-    console.error("[Config Error] Invalid backend API base URL:", rawUrl);
+    console.error("[Config Error] Invalid backend API base URL configuration.");
     throw new Error("Invalid backend API base URL configuration.");
   }
+}
+
+function logPublicRequestFailure(
+  url: string,
+  category: "http" | "invalid_response" | "transport_or_parse",
+  status: number | null,
+  message: string
+): void {
+  if (typeof window !== "undefined") return;
+  console.error(
+    `[Storefront API] endpoint=${new URL(url).pathname} status=${status ?? "none"} category=${category} message=${message}`
+  );
 }
 
 /**
@@ -133,16 +160,17 @@ export async function fetchPublicSettings(): Promise<ApiPublicSettings | null> {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
-      console.warn(`[API] Failed to fetch public settings (${res.status}) from ${url}`);
+      logPublicRequestFailure(url, "http", res.status, "Public settings request failed");
       return null;
     }
     const json = await res.json();
     if (json.success && json.data) {
       return json.data as ApiPublicSettings;
     }
+    logPublicRequestFailure(url, "invalid_response", res.status, "Public settings response was incomplete");
     return null;
-  } catch (err) {
-    console.warn(`[API] Network error fetching public settings:`, (err as Error)?.message);
+  } catch {
+    logPublicRequestFailure(url, "transport_or_parse", null, "Public settings request could not be read");
     return null;
   }
 }
@@ -160,16 +188,17 @@ export async function fetchStorefront(slug: string): Promise<ApiStorefrontDetail
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
-      console.warn(`[API] Failed to fetch storefront "${slug}" (${res.status}) from ${url}`);
+      logPublicRequestFailure(url, "http", res.status, "Storefront details request failed");
       return null;
     }
     const json = await res.json();
     if (json.success && json.data?.storefront) {
       return json.data.storefront as ApiStorefrontDetails;
     }
+    logPublicRequestFailure(url, "invalid_response", res.status, "Storefront details response was incomplete");
     return null;
-  } catch (err) {
-    console.warn(`[API] Network error fetching storefront "${slug}":`, (err as Error)?.message);
+  } catch {
+    logPublicRequestFailure(url, "transport_or_parse", null, "Storefront details request could not be read");
     return null;
   }
 }
@@ -205,16 +234,17 @@ export async function fetchStorefrontProducts(
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
-      console.warn(`[API] Failed to fetch products for "${slug}" (${res.status}) from ${url}`);
+      logPublicRequestFailure(url, "http", res.status, "Storefront products request failed");
       return null;
     }
     const json = await res.json();
     if (json.success && json.data) {
       return json.data as ApiProductsResponse;
     }
+    logPublicRequestFailure(url, "invalid_response", res.status, "Storefront products response was incomplete");
     return null;
-  } catch (err) {
-    console.warn(`[API] Network error fetching products for "${slug}":`, (err as Error)?.message);
+  } catch {
+    logPublicRequestFailure(url, "transport_or_parse", null, "Storefront products request could not be read");
     return null;
   }
 }
@@ -1022,14 +1052,16 @@ export async function fetchPublicReviews(params?: {
     });
 
     if (!res.ok) {
-      console.warn(`[API] Failed to fetch public reviews: ${res.status}`);
+      logPublicRequestFailure(url, "http", res.status, "Public reviews request failed");
       return null;
     }
 
     const json = await res.json();
-    return json?.data as PublicReviewsResponseData;
-  } catch (err) {
-    console.warn("[API] Network error fetching public reviews:", (err as Error)?.message);
+    if (json?.success && json?.data) return json.data as PublicReviewsResponseData;
+    logPublicRequestFailure(url, "invalid_response", res.status, "Public reviews response was incomplete");
+    return null;
+  } catch {
+    logPublicRequestFailure(url, "transport_or_parse", null, "Public reviews request could not be read");
     return null;
   }
 }

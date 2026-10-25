@@ -2,6 +2,7 @@ import { getPrismaClient } from "../src/lib/prisma";
 
 /**
  * Deterministic and idempotent foundation seed script for Kids Wear.
+ * Existing Admin-managed settings are preserved when the seed is rerun.
  *
  * Seeds:
  * 1. Three fixed storefronts (Mini Sprouts, Teen Studio, Aura Studio)
@@ -53,11 +54,7 @@ async function main(): Promise<void> {
   // 2. AnnouncementBar Singleton (single record, singletonKey = 1)
   const announcement = await prisma.announcementBar.upsert({
     where: { singletonKey: 1 },
-    update: {
-      text: null,
-      link: null,
-      isActive: false,
-    },
+    update: {},
     create: {
       singletonKey: 1,
       text: null,
@@ -73,11 +70,7 @@ async function main(): Promise<void> {
   // 3. CommerceSettings Singleton (single record, singletonKey = 1)
   const settings = await prisma.commerceSettings.upsert({
     where: { singletonKey: 1 },
-    update: {
-      flatDeliveryCharge: 300.0,
-      newOrderEmailEnabled: true,
-      newOrderNotificationRecipient: "sk.fabrica@gmail.com",
-    },
+    update: {},
     create: {
       singletonKey: 1,
       flatDeliveryCharge: 300.0,
