@@ -2,7 +2,9 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import type { PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "../../lib/prisma";
 import { BadRequestError, NotFoundError } from "../../lib/errors";
+import { getCloudinaryService } from "../../lib/cloudinary";
 import { requireAdmin, requireAdminCsrf } from "../admin-auth/guards";
+import { z } from "zod";
 import {
   createHeroSlideSchema,
   reorderHeroSlidesSchema,
@@ -32,6 +34,88 @@ export const adminStorefrontRoutes: FastifyPluginAsync = async (
   app: FastifyInstance
 ): Promise<void> => {
   const prisma = getPrismaClient();
+
+  const heroUploadSchema = z.object({ placement: z.enum(["desktop", "mobile"]) }).strict();
+  const heroRegistrationSchema = z.object({
+    placement: z.enum(["desktop", "mobile"]),
+    publicId: z.string().min(1),
+  }).strict();
+
+  app.post<{ Params: { storefrontId: string } }>(
+    "/:storefrontId/hero-media/upload-signature",
+    { preHandler: [requireAdmin, requireAdminCsrf] },
+    async (request, reply) => {
+      const { storefrontId } = request.params;
+      if (!(await prisma.storefront.findUnique({ where: { id: storefrontId } }))) {
+        throw new NotFoundError("Storefront not found", "STOREFRONT_NOT_FOUND");
+      }
+      const parsed = heroUploadSchema.safeParse(request.body);
+      if (!parsed.success) throw new BadRequestError("Invalid hero image placement", "VALIDATION_ERROR");
+      const service = getCloudinaryService();
+      if (!service.createHeroUploadSignature) {
+        throw new BadRequestError("Hero image upload is unavailable", "MEDIA_UPLOAD_UNAVAILABLE");
+      }
+      const signature = await service.createHeroUploadSignature({ storefrontId, ...parsed.data });
+      reply.status(200).send({ success: true, data: signature });
+    }
+  );
+
+  app.post<{ Params: { storefrontId: string } }>(
+    "/:storefrontId/hero-media",
+    { preHandler: [requireAdmin, requireAdminCsrf] },
+    async (request, reply) => {
+      const { storefrontId } = request.params;
+      if (!(await prisma.storefront.findUnique({ where: { id: storefrontId } }))) {
+        throw new NotFoundError("Storefront not found", "STOREFRONT_NOT_FOUND");
+      }
+      const parsed = heroRegistrationSchema.safeParse(request.body);
+      if (!parsed.success) throw new BadRequestError("Invalid hero image registration", "VALIDATION_ERROR");
+      const { placement, publicId } = parsed.data;
+      const prefix = `kids-wear/storefronts/${storefrontId}/heroes/${placement}/`;
+      if (!publicId.startsWith(prefix) ||
+          !z.string().uuid().safeParse(publicId.slice(prefix.length)).success) {
+        throw new BadRequestError("Hero image does not belong to this storefront", "MEDIA_NAMESPACE_INVALID");
+      }
+      const metadata = await getCloudinaryService().fetchResourceMetadata(publicId, "image");
+      const { width, height } = placement === "desktop"
+        ? { width: 1920, height: 800 }
+        : { width: 1080, height: 1350 };
+      if (metadata.publicId !== publicId || metadata.resourceType !== "image") {
+        throw new BadRequestError("Hero media must be an image", "INVALID_MEDIA_TYPE");
+      }
+      if (!["jpg", "jpeg", "png", "webp"].includes(metadata.format.toLowerCase())) {
+        throw new BadRequestError("Hero image must be JPEG, PNG, or WebP", "MEDIA_FORMAT_INVALID");
+      }
+      if (metadata.width !== width || metadata.height !== height) {
+        throw new BadRequestError(`Hero ${placement} image must be ${width}×${height}`, "MEDIA_DIMENSIONS_INVALID");
+      }
+      if (!metadata.bytes || metadata.bytes > 10 * 1024 * 1024) {
+        throw new BadRequestError("Hero image must be 10 MB or smaller", "MEDIA_SIZE_INVALID");
+      }
+      if (await prisma.mediaAsset.findFirst({ where: { providerPublicId: publicId } })) {
+        throw new BadRequestError("Hero image is already registered", "MEDIA_ALREADY_REGISTERED");
+      }
+      const mediaAsset = await prisma.mediaAsset.create({
+        data: {
+          mediaType: "IMAGE",
+          provider: "cloudinary",
+          providerPublicId: publicId,
+          secureUrl: metadata.secureUrl,
+          width: metadata.width,
+          height: metadata.height,
+          format: metadata.format,
+          bytes: metadata.bytes,
+        },
+      });
+      reply.status(201).send({ success: true, data: { mediaAsset: {
+        id: mediaAsset.id,
+        secureUrl: mediaAsset.secureUrl,
+        width: mediaAsset.width,
+        height: mediaAsset.height,
+        format: mediaAsset.format,
+      } } });
+    }
+  );
 
   // GET /api/v1/admin/storefronts/:storefrontId/hero-slides
   app.get<{ Params: { storefrontId: string } }>(

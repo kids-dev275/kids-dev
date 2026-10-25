@@ -40,6 +40,11 @@ export interface ReviewUploadSignatureParams {
   reviewSubmissionId: string;
 }
 
+export interface HeroUploadSignatureParams {
+  storefrontId: string;
+  placement: "desktop" | "mobile";
+}
+
 export interface ReviewUploadSignatureResult {
   timestamp: number;
   signature: string;
@@ -58,6 +63,9 @@ export interface ICloudinaryService {
   ): Promise<CloudinaryResourceMetadata>;
   createReviewUploadSignature?(
     params: ReviewUploadSignatureParams
+  ): Promise<ReviewUploadSignatureResult>;
+  createHeroUploadSignature?(
+    params: HeroUploadSignatureParams
   ): Promise<ReviewUploadSignatureResult>;
   deleteResource?(publicId: string, resourceType?: "image" | "video"): Promise<void>;
 }
@@ -207,6 +215,28 @@ export class DefaultCloudinaryService implements ICloudinaryService {
       apiKey,
       cloudName,
       resourceType,
+      folder,
+      publicId,
+    };
+  }
+
+  async createHeroUploadSignature(
+    params: HeroUploadSignatureParams
+  ): Promise<ReviewUploadSignatureResult> {
+    this.ensureConfigured();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `kids-wear/storefronts/${params.storefrontId}/heroes/${params.placement}`;
+    const publicId = crypto.randomUUID();
+    const apiSecret = env.CLOUDINARY_API_SECRET || "development-api-secret";
+    return {
+      timestamp,
+      signature: cloudinary.utils.api_sign_request(
+        { folder, public_id: publicId, timestamp },
+        apiSecret
+      ),
+      apiKey: env.CLOUDINARY_API_KEY || "development-api-key",
+      cloudName: env.CLOUDINARY_CLOUD_NAME || "development-cloud",
+      resourceType: "image",
       folder,
       publicId,
     };

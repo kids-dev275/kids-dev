@@ -161,6 +161,14 @@ export interface AdminHeroSlide {
   } | null;
 }
 
+export interface AdminHeroImageAsset {
+  id: string;
+  secureUrl: string;
+  width: number | null;
+  height: number | null;
+  format: string | null;
+}
+
 export interface AdminAnnouncementSettings {
   text: string | null;
   link: string | null;
@@ -752,6 +760,34 @@ export async function getAdminStorefrontHeroSlides(
       method: "GET",
     }
   );
+}
+
+export async function getAdminHeroUploadSignature(
+  storefrontId: string,
+  placement: "desktop" | "mobile"
+): Promise<ApiResponse<{
+  timestamp: number;
+  signature: string;
+  apiKey: string;
+  cloudName: string;
+  folder: string;
+  publicId: string;
+  resourceType: "image";
+}>> {
+  return adminFetch(`/admin/storefronts/${storefrontId}/hero-media/upload-signature`, {
+    method: "POST",
+    body: JSON.stringify({ placement }),
+  });
+}
+
+export async function registerAdminHeroImage(
+  storefrontId: string,
+  data: { placement: "desktop" | "mobile"; publicId: string }
+): Promise<ApiResponse<{ mediaAsset: AdminHeroImageAsset }>> {
+  return adminFetch(`/admin/storefronts/${storefrontId}/hero-media`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function createAdminHeroSlide(

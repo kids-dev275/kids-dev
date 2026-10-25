@@ -22,9 +22,11 @@ import {
   updateAdminHeroSlide,
   deleteAdminHeroSlide,
   reorderAdminHeroSlides,
+  type AdminHeroImageAsset,
   type AdminStorefrontItem,
   type AdminHeroSlide,
 } from "@/lib/admin-api";
+import { uploadHeroImage, type HeroPlacement } from "@/lib/admin-hero-media";
 import {
   Store,
   Plus,
@@ -34,7 +36,14 @@ import {
   Image as ImageIcon,
   Edit,
   Save,
+  Upload,
 } from "lucide-react";
+
+type HeroPreview = AdminHeroImageAsset & { filename: string };
+
+function existingPreview(asset: AdminHeroImageAsset | null): HeroPreview | null {
+  return asset ? { ...asset, filename: "Previously uploaded image" } : null;
+}
 
 export default function AdminStorefrontsPage() {
   const [storefronts, setStorefronts] = useState<AdminStorefrontItem[]>([]);
@@ -43,6 +52,7 @@ export default function AdminStorefrontsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage, successFading] = useTransientFeedback<string>();
   const [slidesLoadFailed, setSlidesLoadFailed] = useState(false);
   const slideRequestId = useRef(0);
@@ -59,6 +69,13 @@ export default function AdminStorefrontsPage() {
     mobileImageAssetId: "",
     isActive: true,
   });
+  const [heroPreviews, setHeroPreviews] = useState<Record<HeroPlacement, HeroPreview | null>>({
+    desktop: null,
+    mobile: null,
+  });
+  const [uploadingPlacement, setUploadingPlacement] = useState<HeroPlacement | null>(null);
+  const desktopInputRef = useRef<HTMLInputElement>(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch initial storefronts
   useEffect(() => {
@@ -140,6 +157,8 @@ export default function AdminStorefrontsPage() {
       mobileImageAssetId: "",
       isActive: true,
     });
+    setHeroPreviews({ desktop: null, mobile: null });
+    setModalError(null);
     setIsSlideModalOpen(true);
   };
 
@@ -154,14 +173,54 @@ export default function AdminStorefrontsPage() {
       mobileImageAssetId: slide.mobileImageAsset?.id || "",
       isActive: slide.isActive,
     });
+    setHeroPreviews({
+      desktop: existingPreview(slide.desktopImageAsset),
+      mobile: existingPreview(slide.mobileImageAsset),
+    });
+    setModalError(null);
     setIsSlideModalOpen(true);
+  };
+
+  const handleHeroImageSelection = async (
+    placement: HeroPlacement,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedStorefrontId || uploadingPlacement) return;
+    setUploadingPlacement(placement);
+    setModalError(null);
+    try {
+      const asset = await uploadHeroImage(selectedStorefrontId, placement, file);
+      setHeroPreviews((current) => ({ ...current, [placement]: { ...asset, filename: file.name } }));
+      setSlideForm((current) => ({
+        ...current,
+        [placement === "desktop" ? "desktopImageAssetId" : "mobileImageAssetId"]: asset.id,
+      }));
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "Hero image upload failed.");
+    } finally {
+      setUploadingPlacement(null);
+    }
+  };
+
+  const handleRemoveHeroImage = (placement: HeroPlacement) => {
+    setHeroPreviews((current) => ({ ...current, [placement]: null }));
+    setSlideForm((current) => ({
+      ...current,
+      [placement === "desktop" ? "desktopImageAssetId" : "mobileImageAssetId"]: "",
+    }));
   };
 
   const handleSaveSlide = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStorefrontId) return;
+    if (!selectedStorefrontId || uploadingPlacement || isSaving) return;
+    if (!slideForm.desktopImageAssetId) {
+      setModalError("Upload a desktop hero image before saving the slide.");
+      return;
+    }
     setIsSaving(true);
-    setErrorMessage(null);
+    setModalError(null);
     setSuccessMessage(null);
 
     try {
@@ -182,7 +241,7 @@ export default function AdminStorefrontsPage() {
           setIsSlideModalOpen(false);
           await fetchSlides();
         } else {
-          setErrorMessage(res.error?.message || "Failed to update hero slide.");
+          setModalError(res.error?.message || "Failed to update hero slide.");
         }
       } else {
         const res = await createAdminHeroSlide(selectedStorefrontId, payload);
@@ -191,11 +250,11 @@ export default function AdminStorefrontsPage() {
           setIsSlideModalOpen(false);
           await fetchSlides();
         } else {
-          setErrorMessage(res.error?.message || "Failed to create hero slide.");
+          setModalError(res.error?.message || "Failed to create hero slide.");
         }
       }
     } catch {
-      setErrorMessage("Network error saving hero slide.");
+      setModalError("Network error saving hero slide.");
     } finally {
       setIsSaving(false);
     }
@@ -516,11 +575,14 @@ export default function AdminStorefrontsPage() {
           {/* Slide Modal (Create / Edit) using AdminModal primitive */}
           <AdminModal
             isOpen={isSlideModalOpen}
-            onClose={() => setIsSlideModalOpen(false)}
+            onClose={() => { if (!uploadingPlacement && !isSaving) setIsSlideModalOpen(false); }}
             title={editingSlideId ? "Edit Hero Slide" : "New Hero Slide"}
-            description="Configure promotional hero banner display and asset links"
+            description="Configure promotional hero banner display and images"
           >
             <form onSubmit={handleSaveSlide} className="space-y-4 text-xs">
+              {modalError && (
+                <AdminAlert type="error" message={modalError} onDismiss={() => setModalError(null)} />
+              )}
               <div>
                 <label
                   htmlFor="hero-heading"
@@ -591,47 +653,61 @@ export default function AdminStorefrontsPage() {
                 </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="hero-desktop-asset"
-                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
-                >
-                  Desktop Media Asset ID (UUID) *
-                </label>
-                <input
-                  id="hero-desktop-asset"
-                  type="text"
-                  required
-                  value={slideForm.desktopImageAssetId}
-                  onChange={(e) =>
-                    setSlideForm({ ...slideForm, desktopImageAssetId: e.target.value })
-                  }
-                  placeholder="e.g. c3923f03-62be-4977-b8db-4e78ea6e979f"
-                  className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
-                />
-                <span className="text-[10px] text-brand-muted mt-0.5 block">
-                  Target 1920×800 image uploaded via media service
-                </span>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="hero-mobile-asset"
-                  className="block text-xs uppercase tracking-wider font-semibold text-brand-ink mb-1"
-                >
-                  Mobile Media Asset ID (UUID, Optional)
-                </label>
-                <input
-                  id="hero-mobile-asset"
-                  type="text"
-                  value={slideForm.mobileImageAssetId}
-                  onChange={(e) =>
-                    setSlideForm({ ...slideForm, mobileImageAssetId: e.target.value })
-                  }
-                  placeholder="Optional target 1080×1350 mobile crop"
-                  className="w-full px-3 py-1.5 font-mono text-[11px] bg-brand-canvas/30 border border-brand-border rounded-sm text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink transition-colors"
-                />
-              </div>
+              {(["desktop", "mobile"] as const).map((placement) => {
+                const preview = heroPreviews[placement];
+                const label = placement === "desktop" ? "Desktop Hero Image *" : "Mobile Hero Image (Optional)";
+                return (
+                  <div key={placement} className="space-y-2">
+                    <span className="block text-xs uppercase tracking-wider font-semibold text-brand-ink">
+                      {label}
+                    </span>
+                    <input
+                      id={`hero-${placement}-image`}
+                      ref={placement === "desktop" ? desktopInputRef : mobileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      aria-label={label}
+                      className="sr-only"
+                      disabled={!!uploadingPlacement || isSaving}
+                      onChange={(event) => void handleHeroImageSelection(placement, event)}
+                    />
+                    {preview && (
+                      <div className="flex items-center gap-3 rounded-md border border-brand-border bg-brand-canvas/30 p-2">
+                        <Image
+                          src={preview.secureUrl}
+                          alt={`${placement} hero image preview`}
+                          width={placement === "desktop" ? 120 : 72}
+                          height={placement === "desktop" ? 50 : 90}
+                          className={`${placement === "desktop" ? "h-16 w-24" : "h-20 w-16"} rounded-sm object-cover`}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-brand-ink" title={preview.filename}>{preview.filename}</p>
+                          <p className="text-brand-muted">{preview.width} × {preview.height} px</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => (placement === "desktop" ? desktopInputRef : mobileInputRef).current?.click()}
+                        disabled={!!uploadingPlacement || isSaving}
+                        className="inline-flex items-center gap-1 rounded-sm border border-brand-border px-3 py-1.5 font-semibold text-brand-ink hover:bg-brand-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink disabled:opacity-50"
+                      >
+                        <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                        {uploadingPlacement === placement ? "Uploading..." : preview ? "Replace" : "Upload Image"}
+                      </button>
+                      {preview && (
+                        <button type="button" onClick={() => handleRemoveHeroImage(placement)} disabled={!!uploadingPlacement || isSaving} className="text-rose-700 underline underline-offset-2 disabled:opacity-50">
+                          Remove
+                        </button>
+                      )}
+                      <span className="text-[10px] text-brand-muted">
+                        {placement === "desktop" ? "1920 × 800" : "1080 × 1350"} · JPEG, PNG, WebP · max 10 MB
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
 
               <div className="pt-2">
                 <label className="inline-flex items-center space-x-2 cursor-pointer">
@@ -651,13 +727,14 @@ export default function AdminStorefrontsPage() {
                 <button
                   type="button"
                   onClick={() => setIsSlideModalOpen(false)}
+                  disabled={!!uploadingPlacement || isSaving}
                   className="px-3 py-1.5 border border-brand-border rounded-sm text-brand-muted hover:text-brand-ink font-semibold uppercase tracking-wider transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || !!uploadingPlacement || !slideForm.desktopImageAssetId}
                   className="inline-flex items-center space-x-1.5 px-4 py-2 bg-brand-ink text-white rounded-sm font-semibold uppercase tracking-wider text-xs shadow-xs hover:bg-brand-text active:bg-brand-ink/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <Save className="w-3.5 h-3.5" aria-hidden="true" />

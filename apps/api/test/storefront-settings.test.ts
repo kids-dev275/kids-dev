@@ -12,6 +12,8 @@ import {
   hashCustomerSessionToken,
 } from "../src/modules/customer-auth/services/session";
 import { env } from "../src/config/env";
+import { setCloudinaryService, resetCloudinaryService, type ICloudinaryService, type CloudinaryResourceMetadata, type UploadSignatureParams, type UploadSignatureResult, type HeroUploadSignatureParams } from "../src/lib/cloudinary";
+import crypto from "node:crypto";
 
 const TEST_ADMIN_EMAIL = "sk.fabrica@gmail.com";
 const TEST_ADMIN_PASSWORD = "TestAdminSecurePassword123!";
@@ -129,6 +131,7 @@ async function runSuite(): Promise<void> {
 
   // Track created HeroSlide IDs for cleanup
   const createdSlideIds: string[] = [];
+  const registeredHeroAssetIds: string[] = [];
 
   // ==========================================================================
   // PART A — PUBLIC STOREFRONTS
@@ -217,6 +220,7 @@ async function runSuite(): Promise<void> {
     );
   });
 
+  let activePublicSlideId = "";
   // 7. inactive Hero Slide hidden publicly
   await runTest("inactive Hero Slide hidden publicly", async () => {
     // Create an active slide and an inactive slide
@@ -230,6 +234,7 @@ async function runSuite(): Promise<void> {
       },
     });
     createdSlideIds.push(activeSlide.id);
+    activePublicSlideId = activeSlide.id;
 
     const inactiveSlide = await prisma.heroSlide.create({
       data: {
@@ -277,9 +282,11 @@ async function runSuite(): Promise<void> {
     const json = JSON.parse(res.body);
     const slides = json.data.storefront.heroSlides;
     assert(slides.length >= 2, "Expected at least 2 active slides");
-    assert(slides[0].id === firstSlide.id, "Slide with sortOrder 0 must be first");
+    const firstIndex = slides.findIndex((s: { id: string }) => s.id === firstSlide.id);
+    const activeIndex = slides.findIndex((s: { id: string }) => s.id === activePublicSlideId);
+    assert(firstIndex >= 0 && activeIndex > firstIndex, "Slide with sortOrder 0 must precede sortOrder 1");
     assert(
-      slides[0].desktopImageAsset.secureUrl !== undefined,
+      slides[firstIndex].desktopImageAsset.secureUrl !== undefined,
       "Media asset details should be populated"
     );
   });
@@ -409,6 +416,135 @@ async function runSuite(): Promise<void> {
       `Expected MEDIA_ASSET_NOT_FOUND, got ${json.error.code}`
     );
   });
+
+  const heroResources = new Map<string, CloudinaryResourceMetadata>();
+  const heroCloudinary: ICloudinaryService = {
+    async createUploadSignature(_params: UploadSignatureParams): Promise<UploadSignatureResult> {
+      throw new Error("Product upload should not be used for hero images");
+    },
+    async createHeroUploadSignature({ storefrontId, placement }: HeroUploadSignatureParams) {
+      const folder = `kids-wear/storefronts/${storefrontId}/heroes/${placement}`;
+      return {
+        timestamp: 1,
+        signature: "test-signature",
+        apiKey: "test-key",
+        cloudName: "test-cloud",
+        resourceType: "image" as const,
+        folder,
+        publicId: crypto.randomUUID(),
+      };
+    },
+    async fetchResourceMetadata(publicId: string) {
+      const resource = heroResources.get(publicId);
+      if (!resource) throw new Error("Cloudinary image lookup failed");
+      return resource;
+    },
+  };
+  setCloudinaryService(heroCloudinary);
+  const heroHeaders = { cookie: adminCookieHeader, "x-csrf-token": adminCsrf };
+  let uploadedAssetId = "";
+  let uploadedHeroId = "";
+
+  await runTest("hero upload requires Admin authentication and CSRF", async () => {
+    const url = `/api/v1/admin/storefronts/${miniSproutsId}/hero-media/upload-signature`;
+    const anonymous = await app.inject({ method: "POST", url, payload: { placement: "desktop" } });
+    assert(anonymous.statusCode === 401, `Expected 401, got ${anonymous.statusCode}`);
+    const withoutCsrf = await app.inject({ method: "POST", url, headers: { cookie: adminCookieHeader }, payload: { placement: "desktop" } });
+    assert(withoutCsrf.statusCode === 403, `Expected 403, got ${withoutCsrf.statusCode}`);
+    const register = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`, payload: { placement: "desktop", publicId: "x" } });
+    assert(register.statusCode === 401, `Expected 401, got ${register.statusCode}`);
+  });
+
+  await runTest("hero image upload registers MediaAsset and saves slide association", async () => {
+    const signatureResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media/upload-signature`,
+      headers: heroHeaders,
+      payload: { placement: "desktop" },
+    });
+    assert(signatureResponse.statusCode === 200, `Expected 200, got ${signatureResponse.statusCode}`);
+    const signature = JSON.parse(signatureResponse.body).data as { folder: string; publicId: string };
+    const publicId = `${signature.folder}/${signature.publicId}`;
+    heroResources.set(publicId, {
+      publicId, secureUrl: `https://res.cloudinary.com/test/image/upload/${publicId}.webp`,
+      resourceType: "image", format: "webp", width: 1920, height: 800, bytes: 100000,
+    });
+    const registered = await app.inject({
+      method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`,
+      headers: heroHeaders, payload: { placement: "desktop", publicId },
+    });
+    assert(registered.statusCode === 201, `Expected 201, got ${registered.statusCode}`);
+    uploadedAssetId = JSON.parse(registered.body).data.mediaAsset.id;
+    registeredHeroAssetIds.push(uploadedAssetId);
+    const asset = await prisma.mediaAsset.findUnique({ where: { id: uploadedAssetId } });
+    assert(asset?.providerPublicId === publicId, "Uploaded MediaAsset not persisted");
+    const slide = await app.inject({
+      method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-slides`,
+      headers: heroHeaders, payload: { heading: "Little Styles, Big Smiles", desktopImageAssetId: uploadedAssetId },
+    });
+    assert(slide.statusCode === 201, `Expected 201, got ${slide.statusCode}`);
+    uploadedHeroId = JSON.parse(slide.body).data.heroSlide.id;
+    createdSlideIds.push(uploadedHeroId);
+    assert(JSON.parse(slide.body).data.heroSlide.desktopImageAssetId === uploadedAssetId, "Slide did not use uploaded asset");
+  });
+
+  await runTest("hero slide without desktop image is rejected", async () => {
+    const res = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-slides`, headers: heroHeaders, payload: { heading: "Missing image" } });
+    assert(res.statusCode === 400, `Expected 400, got ${res.statusCode}`);
+  });
+
+  await runTest("hero registration rejects wrong media type and foreign namespace", async () => {
+    const publicId = `kids-wear/storefronts/${miniSproutsId}/heroes/desktop/${crypto.randomUUID()}`;
+    heroResources.set(publicId, {
+      publicId, secureUrl: "https://res.cloudinary.com/test/video/upload/invalid.mp4",
+      resourceType: "video", format: "mp4", width: 1920, height: 800, bytes: 100000,
+    });
+    const invalid = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`, headers: heroHeaders, payload: { placement: "desktop", publicId } });
+    assert(invalid.statusCode === 400, `Expected 400, got ${invalid.statusCode}`);
+    const foreign = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`, headers: heroHeaders, payload: { placement: "desktop", publicId: `kids-wear/storefronts/${teenStudioId}/heroes/desktop/${crypto.randomUUID()}` } });
+    assert(foreign.statusCode === 400, `Expected 400, got ${foreign.statusCode}`);
+  });
+
+  await runTest("hero registration rejects wrong dimensions and oversized images", async () => {
+    const publicId = `kids-wear/storefronts/${miniSproutsId}/heroes/desktop/${crypto.randomUUID()}`;
+    const resource: CloudinaryResourceMetadata = {
+      publicId, secureUrl: `https://res.cloudinary.com/test/image/upload/${publicId}.webp`,
+      resourceType: "image", format: "webp", width: 1672, height: 941, bytes: 100000,
+    };
+    heroResources.set(publicId, resource);
+    const url = `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`;
+    const dimensions = await app.inject({ method: "POST", url, headers: heroHeaders, payload: { placement: "desktop", publicId } });
+    assert(dimensions.statusCode === 400, `Expected 400, got ${dimensions.statusCode}`);
+    assert(JSON.parse(dimensions.body).error.code === "MEDIA_DIMENSIONS_INVALID", "Expected dimension validation");
+    heroResources.set(publicId, { ...resource, width: 1920, height: 800, bytes: 11 * 1024 * 1024 });
+    const size = await app.inject({ method: "POST", url, headers: heroHeaders, payload: { placement: "desktop", publicId } });
+    assert(size.statusCode === 400, `Expected 400, got ${size.statusCode}`);
+    assert(JSON.parse(size.body).error.code === "MEDIA_SIZE_INVALID", "Expected size validation");
+  });
+
+  await runTest("optional mobile hero image registers and associates with slide", async () => {
+    const publicId = `kids-wear/storefronts/${miniSproutsId}/heroes/mobile/${crypto.randomUUID()}`;
+    heroResources.set(publicId, {
+      publicId, secureUrl: `https://res.cloudinary.com/test/image/upload/${publicId}.webp`,
+      resourceType: "image", format: "webp", width: 1080, height: 1350, bytes: 100000,
+    });
+    const registered = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`, headers: heroHeaders, payload: { placement: "mobile", publicId } });
+    assert(registered.statusCode === 201, `Expected 201, got ${registered.statusCode}`);
+    const mobileId = JSON.parse(registered.body).data.mediaAsset.id as string;
+    registeredHeroAssetIds.push(mobileId);
+    const updated = await app.inject({ method: "PATCH", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-slides/${uploadedHeroId}`, headers: heroHeaders, payload: { mobileImageAssetId: mobileId } });
+    assert(updated.statusCode === 200, `Expected 200, got ${updated.statusCode}`);
+    assert(JSON.parse(updated.body).data.heroSlide.mobileImageAssetId === mobileId, "Mobile image not associated");
+  });
+
+  await runTest("failed replacement upload preserves existing hero image", async () => {
+    const missingId = `kids-wear/storefronts/${miniSproutsId}/heroes/desktop/${crypto.randomUUID()}`;
+    const failed = await app.inject({ method: "POST", url: `/api/v1/admin/storefronts/${miniSproutsId}/hero-media`, headers: heroHeaders, payload: { placement: "desktop", publicId: missingId } });
+    assert(failed.statusCode !== 201, "Failed replacement registered unexpectedly");
+    const slide = await prisma.heroSlide.findUnique({ where: { id: uploadedHeroId } });
+    assert(slide?.desktopImageAssetId === uploadedAssetId, "Existing hero image changed after failed replacement");
+  });
+  resetCloudinaryService();
 
   // 15. Hero update succeeds
   await runTest("Hero update succeeds", async () => {
@@ -1160,7 +1296,7 @@ async function runSuite(): Promise<void> {
 
   // Clean up test MediaAssets
   await prisma.mediaAsset.deleteMany({
-    where: { id: { in: [desktopAsset.id, mobileAsset.id, videoAsset.id] } },
+    where: { id: { in: [desktopAsset.id, mobileAsset.id, videoAsset.id, ...registeredHeroAssetIds] } },
   });
 
   // Clean up Customer and CustomerSession
