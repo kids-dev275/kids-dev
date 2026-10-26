@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { MapPin, Phone, Mail, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
 
 export const metadata: Metadata = {
@@ -125,75 +125,21 @@ export default function GatewayPage() {
       {/* Semantic Accessible Heading for Document Outline */}
       <h1 className="sr-only">Kids Wear</h1>
 
-      {/* Three-Part Editorial Header */}
+      {/* Centered Gateway Branding */}
       <header className="w-full border-b border-brand-border/60 bg-white/40 backdrop-blur-xs shrink-0">
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-2 sm:gap-4">
-            {/* Left: Business Address */}
-            <div className="hidden md:flex items-center gap-2.5 text-xs lg:text-[13px] text-brand-muted">
-              <MapPin className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
-              <div className="leading-snug">
-                <p className="font-medium text-brand-ink text-xs lg:text-[13px]">Street-05, Darul Islam Colony</p>
-                <p className="text-brand-muted text-[11px] lg:text-xs">Attock, Pakistan</p>
-              </div>
-            </div>
-
-            {/* Center: Kids Wear Logo & Tagline */}
-            <div className="flex flex-col items-center justify-center text-center">
-              <Image
-                src="/brand/kids-wear-logo.webp"
-                alt="Kids Wear"
-                width={120}
-                height={78}
-                priority
-                className="w-[90px] sm:w-[100px] md:w-[110px] lg:w-[118px] h-auto object-contain"
-              />
-              <p className="font-editorial italic text-[11px] sm:text-xs text-brand-text/80 tracking-wide mt-0.5">
-                Little Styles. Brighter Tomorrows.
-              </p>
-            </div>
-
-            {/* Right: Phone & Email */}
-            <div className="hidden md:flex flex-col items-end justify-center gap-0.5 text-xs lg:text-[13px] text-brand-muted">
-              <a
-                href="tel:+923350981321"
-                className="inline-flex items-center gap-1.5 text-brand-ink hover:text-champagne transition-colors font-medium text-xs lg:text-[13px]"
-              >
-                <Phone className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
-                <span>+92 335 0981321</span>
-              </a>
-              <a
-                href="mailto:info@thekidswear.com"
-                className="inline-flex items-center gap-1.5 text-brand-text hover:text-champagne transition-colors text-[11px] lg:text-xs"
-              >
-                <Mail className="w-3.5 h-3.5 text-champagne shrink-0" aria-hidden="true" />
-                <span>info@thekidswear.com</span>
-              </a>
-            </div>
-
-            {/* Mobile-only Address & Contact Bar */}
-            <div className="flex md:hidden items-center justify-between text-[11px] text-brand-muted border-t border-brand-border/40 pt-2 mt-1">
-              <div className="flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-champagne shrink-0" aria-hidden="true" />
-                <span className="truncate">Attock, Pakistan</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <a
-                  href="tel:+923350981321"
-                  className="inline-flex items-center gap-1 text-brand-ink hover:text-champagne font-medium"
-                >
-                  <Phone className="w-3 h-3 text-champagne" aria-hidden="true" />
-                  <span>+92 335 0981321</span>
-                </a>
-                <a
-                  href="mailto:info@thekidswear.com"
-                  className="inline-flex items-center gap-1 text-brand-muted hover:text-champagne"
-                  aria-label="Email info@thekidswear.com"
-                >
-                  <Mail className="w-3 h-3 text-champagne" aria-hidden="true" />
-                </a>
-              </div>
-            </div>
+          <div className="flex flex-col items-center justify-center text-center">
+            <Image
+              src="/brand/kids-wear-logo.webp"
+              alt="Kids Wear"
+              width={120}
+              height={78}
+              priority
+              className="w-[90px] sm:w-[100px] md:w-[110px] lg:w-[118px] h-auto object-contain"
+            />
+            <p className="font-editorial italic text-[11px] sm:text-xs text-brand-text/80 tracking-wide mt-0.5">
+              Little Styles. Brighter Tomorrows.
+            </p>
           </div>
         </div>
       </header>

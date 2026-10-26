@@ -125,6 +125,20 @@ async function runSuite() {
     assert(!html.includes("Girls"), "No gender gateways permitted");
   });
 
+  await runTest("5a. Gateway header shows centered branding without contact details", () => {
+    const html = renderToStaticMarkup(<GatewayPage />);
+    const header = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/)?.[0];
+    assert(header, "Gateway must render a header");
+    assert(header.includes('alt="Kids Wear"'), "Header must retain the Kids Wear logo");
+    assert(header.includes("Little Styles. Brighter Tomorrows."), "Header must retain the tagline");
+    assert(header.includes("items-center justify-center text-center"), "Branding must remain centered");
+    assert(!header.includes("Street-05") && !header.includes("Darul Islam Colony") && !header.includes("Attock, Pakistan"), "Header must not show the address");
+    assert(!header.includes("0981321") && !header.includes("tel:"), "Header must not show the phone number or link");
+    assert(!header.includes("info@thekidswear.com") && !header.includes("mailto:"), "Header must not show the email or link");
+    assert(!header.includes("<svg"), "Header must not retain contact icons");
+    assert.equal((html.match(/data-storefront=/g) || []).length, 3, "All three storefront cards must remain");
+  });
+
   // ============================================================================
   // Announcement Bar Tests (6–9)
   // ============================================================================
