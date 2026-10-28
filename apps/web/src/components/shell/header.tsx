@@ -7,7 +7,6 @@ import { Search, ShoppingBag, User } from "lucide-react";
 import { STOREFRONT_THEMES, type StorefrontSlug } from "@/components/theme/storefront-tokens";
 import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
 import { CartUnitBadge } from "@/components/cart/cart-badge";
-import { StorefrontSwitcher } from "./storefront-switcher";
 import { MobileNav } from "./mobile-nav";
 
 export function Header({ storefront }: { storefront: StorefrontSlug }) {
@@ -59,18 +58,17 @@ export function Header({ storefront }: { storefront: StorefrontSlug }) {
               />
             </Link>
           </div>
-          <div className="hidden flex-col items-center justify-center gap-1.5 lg:flex">
-            <StorefrontSwitcher currentStorefront={storefront} variant="compact" homepage />
+          <div className="hidden items-center justify-center lg:flex">
             <nav
               aria-label="Main Navigation"
-              className="flex items-center justify-center gap-5 whitespace-nowrap text-sm font-medium text-ink xl:gap-7"
+              className="flex items-center justify-center gap-4 whitespace-nowrap text-[17px] font-medium text-ink xl:gap-7"
             >
               {nav.map(({ label, href, active }) => (
                 <Link
                   key={label}
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className={`hover:text-[var(--color-storefront-contrast)] ${active ? "text-[var(--color-storefront-contrast)] underline underline-offset-4" : ""}`}
+                  className={`hover:text-[var(--color-storefront-contrast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 ${active ? "text-[var(--color-storefront-contrast)] underline underline-offset-4" : ""}`}
                 >
                   {label}
                 </Link>

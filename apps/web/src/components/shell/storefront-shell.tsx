@@ -17,7 +17,7 @@ export interface StorefrontShellProps {
  * StorefrontShell wraps storefront pages with the unified customer shell:
  * - Theme-scoped CSS accent tokens
  * - Global Announcement Bar
- * - Shared Header with Storefront switcher and navigation
+ * - Shared Header with storefront navigation
  * - Semantic main landmark
  * - Shared Footer
  */

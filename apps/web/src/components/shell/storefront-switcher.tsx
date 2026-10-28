@@ -1,62 +1,51 @@
 import React from "react";
 import Link from "next/link";
-import { STOREFRONT_THEMES, StorefrontSlug } from "@/components/theme/storefront-tokens";
+import {
+  STOREFRONT_THEMES,
+  STOREFRONT_SLUGS,
+  type StorefrontSlug,
+} from "@/components/theme/storefront-tokens";
 
 export interface StorefrontSwitcherProps {
   currentStorefront: StorefrontSlug;
   className?: string;
-  variant?: "pill" | "compact";
-  homepage?: boolean;
 }
 
-const STOREFRONT_SLUGS: StorefrontSlug[] = ["mini-sprouts", "teen-studio", "aura-studio"];
-
-/**
- * Compact, keyboard-accessible Storefront Switcher allowing movement
- * between Mini Sprouts, Teen Studio, and Aura Studio homepages.
- */
+/** Links to the three storefront homepages without changing route preference behavior. */
 export function StorefrontSwitcher({
   currentStorefront,
   className = "",
-  variant = "pill",
-  homepage = false,
 }: StorefrontSwitcherProps) {
   return (
     <nav
       aria-label="Storefront Switcher"
-      className={`inline-flex items-center ${className}`.trim()}
+      className={`grid w-full max-w-[720px] grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 ${className}`.trim()}
     >
-      <div
-        className={`flex items-center gap-1 rounded-full p-1 border border-border bg-surface shadow-subtle ${
-          variant === "compact" ? "text-xs" : "text-xs sm:text-sm"
-        }`}
-      >
-        {STOREFRONT_SLUGS.map((slug) => {
-          const theme = STOREFRONT_THEMES[slug];
-          const isCurrent = currentStorefront === slug;
+      {STOREFRONT_SLUGS.map((slug) => {
+        const theme = STOREFRONT_THEMES[slug];
+        const isCurrent = currentStorefront === slug;
 
-          return (
-            <Link
-              key={slug}
-              href={`/${slug}`}
-              prefetch={false}
-              aria-current={isCurrent ? "page" : undefined}
-              className={`px-3 py-1 rounded-full font-sans font-medium transition-all flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront ${
-                isCurrent
-                  ? `${homepage ? "bg-[var(--color-storefront-contrast)]" : "bg-accent-storefront"} text-white shadow-subtle font-semibold`
-                  : "text-text-base hover:text-ink hover:bg-surface-soft"
-              }`}
+        return (
+          <Link
+            key={slug}
+            href={`/${slug}`}
+            prefetch={false}
+            aria-current={isCurrent ? "page" : undefined}
+            className={`flex min-h-16 flex-col items-center justify-center rounded-md border px-4 py-2 text-center font-sans transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-offset-2 ${
+              isCurrent
+                ? "border-[var(--color-storefront-contrast)] bg-[var(--color-storefront-contrast)] text-white"
+                : "border-border bg-surface text-ink hover:border-[var(--color-storefront-contrast)] hover:bg-surface-soft"
+            }`}
+          >
+            <span className="text-sm font-semibold leading-tight">{theme.name}</span>
+            <span
+              className={`mt-0.5 text-xs leading-tight ${isCurrent ? "text-white" : "text-text-muted"}`}
             >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${isCurrent ? "bg-white" : ""}`}
-                style={!isCurrent ? { backgroundColor: theme.primaryAccent } : undefined}
-                aria-hidden="true"
-              />
-              <span>{theme.name}</span>
-            </Link>
-          );
-        })}
-      </div>
+              {theme.ageRange}
+            </span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

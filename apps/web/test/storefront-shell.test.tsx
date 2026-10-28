@@ -12,6 +12,7 @@ import { StorefrontSwitcher } from "../src/components/shell/storefront-switcher"
 import { Footer } from "../src/components/shell/footer";
 import { StorefrontShell } from "../src/components/shell/storefront-shell";
 import { HeroSlider } from "../src/components/home/hero-slider";
+import { StorefrontHomeSections } from "../src/components/home/storefront-home-sections";
 import { ShopByAge } from "../src/components/home/shop-by-age";
 import { NewArrivalsSection } from "../src/components/home/new-arrivals-section";
 import { WhyKidsWear } from "../src/components/home/why-kids-wear";
@@ -139,6 +140,23 @@ async function runSuite() {
     assert.equal((html.match(/data-storefront=/g) || []).length, 3, "All three storefront cards must remain");
   });
 
+  await runTest("5b. Gateway cards show only identity, age, and outlined collection links", () => {
+    const html = renderToStaticMarkup(<GatewayPage />);
+    assert.equal((html.match(/data-storefront=/g) || []).length, 3);
+    assert.equal((html.match(/Explore collection/g) || []).length, 3);
+    assert(!html.includes("Playful Outfits for Their Brightest Days"));
+    assert(!html.includes("Trendy Styles for Every Mood"));
+    assert(!html.includes("Modern Looks for What’s Next"));
+    for (const slug of ["mini-sprouts", "teen-studio", "aura-studio"]) {
+      const card = html.match(new RegExp(`<a[^>]*data-storefront="${slug}"[\\s\\S]*?<\\/a>`))?.[0];
+      assert(card, `${slug} card must render`);
+      assert(card.includes(`href="/${slug}"`));
+      assert(card.includes("border bg-transparent"), `${slug} CTA should be outlined`);
+      assert(card.includes("group-focus-visible:ring-2"), `${slug} CTA should show focus`);
+      assert(card.includes("font-editorial text-lg sm:text-xl"), `${slug} age should be prominent`);
+    }
+  });
+
   // ============================================================================
   // Announcement Bar Tests (6–9)
   // ============================================================================
@@ -216,6 +234,46 @@ async function runSuite() {
       html.includes('aria-label="Storefront Switcher"'),
       "Must have accessible switcher label"
     );
+  });
+
+  await runTest("12a. Header contains the larger five-link navigation without a switcher", () => {
+    const html = renderToStaticMarkup(<Header storefront="mini-sprouts" />);
+    assert(!html.includes('aria-label="Storefront Switcher"'));
+    assert(html.includes("text-[17px]"));
+    for (const label of ["Home", "Shop", "New Arrivals", "Reviews", "Contact"]) {
+      assert(html.includes(`>${label}</a>`), `${label} must remain in the header`);
+    }
+  });
+
+  await runTest("12b. Homepage switcher follows services and selects each active storefront", () => {
+    assert(
+      storefrontPageSource.indexOf("<HeroSlider") < storefrontPageSource.indexOf("<StorefrontHomeSections"),
+      "Hero must precede the services and switcher"
+    );
+    for (const slug of ["mini-sprouts", "teen-studio", "aura-studio"] as const) {
+      const html = renderToStaticMarkup(
+        <StorefrontHomeSections storefront={slug} newArrivals={[]} catalog={[]} reviews={[]} />
+      );
+      const serviceEnd = html.indexOf("Bank Transfer");
+      const switcher = html.indexOf('aria-label="Storefront Switcher"');
+      const arrivals = html.indexOf("Just arrived");
+      assert(serviceEnd >= 0 && serviceEnd < switcher && switcher < arrivals);
+      const currentLink = [...html.matchAll(/<a\b[^>]*aria-current="page"[^>]*>/g)]
+        .map(([link]) => link)
+        .find((link) => link.includes(`href="/${slug}"`));
+      assert(currentLink, `${slug} should be the active link`);
+      assert(currentLink.includes("bg-[var(--color-storefront-contrast)]"));
+      for (const destination of ["mini-sprouts", "teen-studio", "aura-studio"]) {
+        assert(html.includes(`href="/${destination}"`));
+        if (destination !== slug) {
+          const inactiveLink = [...html.matchAll(/<a\b[^>]*>/g)]
+            .map(([link]) => link)
+            .find((link) => link.includes(`href="/${destination}"`));
+          assert(inactiveLink && !inactiveLink.includes('aria-current="page"'));
+          assert(inactiveLink.includes("bg-surface text-ink"));
+        }
+      }
+    }
   });
 
   await runTest("13. mobile trigger exposes accessible state attributes", () => {
@@ -626,7 +684,7 @@ async function runSuite() {
   // ============================================================================
 
   await runTest(
-    "41. Gateway renders 3 confirmed Storefront names, age ranges, and neutral copy",
+    "41. Gateway renders 3 confirmed Storefront names and age ranges without card descriptions",
     () => {
       const html = renderToStaticMarkup(<GatewayPage />);
       // 3 confirmed Storefront names
@@ -639,19 +697,7 @@ async function runSuite() {
       assert(html.includes("11–16 Years"), "Must render 11–16 Years");
       assert(html.includes("17+ Years"), "Must render 17+ Years");
 
-      // Confirmed neutral copy
-      assert(
-        html.includes("Explore Kids Wear apparel for ages 0–10."),
-        "Must render neutral copy for Mini Sprouts"
-      );
-      assert(
-        html.includes("Explore Kids Wear apparel for ages 11–16."),
-        "Must render neutral copy for Teen Studio"
-      );
-      assert(
-        html.includes("Explore Kids Wear apparel for ages 17 and above."),
-        "Must render neutral copy for Aura Studio"
-      );
+      assert(!html.includes("Explore Kids Wear apparel for ages"), "Card descriptions must be absent");
     }
   );
 

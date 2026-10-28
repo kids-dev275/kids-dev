@@ -49,13 +49,11 @@ interface GatewayCardData {
   slug: "mini-sprouts" | "teen-studio" | "aura-studio";
   title: string;
   age: string;
-  description: string;
-  srDescription: string;
-  cta: string;
   link: string;
   image: string;
   imageAlt: string;
   accentColor: string;
+  textColor: string;
   panelBg: string;
   objectPosition: string;
 }
@@ -65,13 +63,11 @@ const GATEWAY_CARDS: GatewayCardData[] = [
     slug: "mini-sprouts",
     title: "Mini Sprouts",
     age: "0–10 Years",
-    description: "Playful Outfits for Their Brightest Days",
-    srDescription: "Explore Kids Wear apparel for ages 0–10.",
-    cta: "Explore Collection",
     link: "/mini-sprouts",
     image: "/images/gateway/gateway-mini-sprouts.webp",
     imageAlt: "Children apparel by Mini Sprouts for 0–10 Years",
     accentColor: "#C7656C",
+    textColor: "#98454C",
     panelBg: "#FAF0F1",
     objectPosition: "center top",
   },
@@ -79,13 +75,11 @@ const GATEWAY_CARDS: GatewayCardData[] = [
     slug: "teen-studio",
     title: "Teen Studio",
     age: "11–16 Years",
-    description: "Trendy Styles for Every Mood",
-    srDescription: "Explore Kids Wear apparel for ages 11–16.",
-    cta: "Explore Collection",
     link: "/teen-studio",
     image: "/images/gateway/gateway-teen-studio.webp",
     imageAlt: "Teen apparel by Teen Studio for 11–16 Years",
     accentColor: "#875985",
+    textColor: "#684266",
     panelBg: "#F5EFF5",
     objectPosition: "center top",
   },
@@ -93,13 +87,11 @@ const GATEWAY_CARDS: GatewayCardData[] = [
     slug: "aura-studio",
     title: "Aura Studio",
     age: "17+ Years",
-    description: "Modern Looks for What’s Next",
-    srDescription: "Explore Kids Wear apparel for ages 17 and above.",
-    cta: "Explore Collection",
     link: "/aura-studio",
     image: "/images/gateway/gateway-aura-studio.webp",
     imageAlt: "Young adult apparel by Aura Studio for 17+ Years",
     accentColor: "#8B6B50",
+    textColor: "#674B37",
     panelBg: "#F6EFE8",
     objectPosition: "center top",
   },
@@ -132,10 +124,10 @@ export default function GatewayPage() {
             <Image
               src="/brand/kids-wear-logo.webp"
               alt="Kids Wear"
-              width={120}
-              height={78}
+              width={150}
+              height={98}
               priority
-              className="w-[90px] sm:w-[100px] md:w-[110px] lg:w-[118px] h-auto object-contain"
+              className="w-[112px] sm:w-[125px] md:w-[138px] lg:w-[148px] h-auto object-contain"
             />
             <p className="font-editorial italic text-[11px] sm:text-xs text-brand-text/80 tracking-wide mt-0.5">
               Little Styles. Brighter Tomorrows.
@@ -147,9 +139,9 @@ export default function GatewayPage() {
       {/* Main Storefront Cards Area */}
       <main
         id="main-content"
-        className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-6 py-3 sm:py-4 lg:pt-[14px] lg:pb-5 flex flex-col justify-center lg:justify-start items-center min-h-0"
+        className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-6 py-3 sm:py-4 lg:pt-[14px] lg:pb-5 flex flex-col justify-center md:justify-start items-center min-h-0"
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-[22px] items-stretch w-full md:w-[calc(100%-24px)] mx-auto my-auto lg:my-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-[22px] items-stretch w-full md:w-[calc(100%-24px)] mx-auto my-auto md:my-0">
           {GATEWAY_CARDS.map((card) => (
             <Link
               key={card.slug}
@@ -197,41 +189,38 @@ export default function GatewayPage() {
                 >
                   <div className="flex flex-col items-center">
                     {/* Decorative Icon */}
-                    <div className="mb-1 sm:mb-1.5">
+                    <div className="mb-1.5 sm:mb-2">
                       <StorefrontIdentityIcon
                         storefront={card.slug}
-                        className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+                        className="w-5 h-5"
                         style={{ color: card.accentColor }}
                       />
                     </div>
 
                     {/* Storefront Title */}
-                    <h2 className="font-editorial text-xl sm:text-[22px] lg:text-2xl text-brand-ink font-normal tracking-tight">
+                    <h2
+                      className="font-editorial text-[28px] sm:text-[30px] lg:text-[32px] leading-tight font-normal tracking-tight"
+                      style={{ color: card.textColor }}
+                    >
                       {card.title}
                     </h2>
 
                     {/* Age Range */}
                     <p
-                      className="font-sans text-[10px] sm:text-[11px] uppercase tracking-widest font-semibold mt-0.5"
-                      style={{ color: card.accentColor }}
+                      className="font-editorial text-lg sm:text-xl leading-tight mt-1"
+                      style={{ color: card.textColor }}
                     >
                       {card.age}
                     </p>
-
-                    {/* Description */}
-                    <p className="font-sans text-[11.5px] sm:text-xs text-brand-text/90 mt-1 leading-snug max-w-[240px]">
-                      {card.description}
-                    </p>
-                    <span className="sr-only">{card.srDescription}</span>
                   </div>
 
                   {/* CTA Button */}
                   <div className="w-full mt-3 sm:mt-4">
                     <span
-                      className="w-full min-h-[44px] md:min-h-[38px] inline-flex items-center justify-center gap-1.5 py-1.5 px-4 rounded-full font-sans text-xs font-semibold tracking-wide text-white transition-all duration-200 shadow-sm group-hover:shadow-md group-hover:brightness-105 active:scale-[0.99]"
-                      style={{ backgroundColor: card.accentColor }}
+                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 border bg-transparent py-2 px-4 rounded-md font-sans text-sm font-medium tracking-wide transition-colors duration-200 group-hover:bg-white/70 group-active:bg-white focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-offset-2"
+                      style={{ borderColor: card.accentColor, color: card.textColor }}
                     >
-                      <span>{card.cta}</span>
+                      <span>Explore collection</span>
                       <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true" />
                     </span>
                   </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Truck, CreditCard, Banknote, ArrowRight, Star } from "lucide-react";
 import { STOREFRONT_THEMES, type StorefrontSlug } from "@/components/theme/storefront-tokens";
 import { StorefrontContactSection } from "@/components/home/storefront-contact-section";
+import { StorefrontSwitcher } from "@/components/shell/storefront-switcher";
 import { formatPKR } from "@/components/commerce/price";
 import { ProductCard } from "@/components/commerce/product-card";
 import { ReviewCard } from "@/components/reviews/review-card";
@@ -140,6 +141,9 @@ export function StorefrontHomeSections({
             </div>
           </div>
         ))}
+      </section>
+      <section className="flex justify-center border-b border-border py-7 sm:py-9">
+        <StorefrontSwitcher currentStorefront={storefront} />
       </section>
       <section className="py-12 sm:py-16">
         <SectionHeading
