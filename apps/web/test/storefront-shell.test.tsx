@@ -5,7 +5,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import GatewayPage from "../src/app/page";
-import { getActiveGatewayIndex } from "../src/components/gateway/gateway-card-track";
+import { getActiveGatewayIndex, INITIAL_GATEWAY_INDEX } from "../src/components/gateway/gateway-card-track";
 import { AnnouncementBar } from "../src/components/shell/announcement-bar";
 import { Header } from "../src/components/shell/header";
 import { MobileNav } from "../src/components/shell/mobile-nav";
@@ -173,7 +173,10 @@ async function runSuite() {
     assert(html.includes('aria-label="Storefront cards"'));
     assert.equal((html.match(/data-active="true"/g) || []).length, 1);
     assert.equal((html.match(/data-active="false"/g) || []).length, 2);
-    assert(html.includes("Mini Sprouts, card 1 of 3"));
+    assert.equal(INITIAL_GATEWAY_INDEX, 1);
+    assert(html.includes("Teen Studio, card 2 of 3"));
+    assert(html.indexOf('data-storefront="mini-sprouts"') < html.indexOf('data-storefront="teen-studio"'));
+    assert(html.indexOf('data-storefront="teen-studio"') < html.indexOf('data-storefront="aura-studio"'));
   });
 
   await runTest("5d. Gateway progress selects the most visible card", () => {

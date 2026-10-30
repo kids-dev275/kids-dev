@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+
+export const INITIAL_GATEWAY_INDEX = 1;
 
 interface GatewayIndicator {
   slug: string;
@@ -20,7 +22,23 @@ export function GatewayCardTrack({
   indicators: readonly GatewayIndicator[];
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const initialized = useRef(false);
+  const [activeIndex, setActiveIndex] = useState(INITIAL_GATEWAY_INDEX);
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track || initialized.current || !window.matchMedia("(max-width: 767px)").matches) return;
+    initialized.current = true;
+
+    const target = track.querySelectorAll<HTMLElement>("[data-storefront]")[INITIAL_GATEWAY_INDEX];
+    if (!target) return;
+    const trackRect = track.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const initialScrollLeft = track.scrollLeft + targetRect.left - trackRect.left + targetRect.width / 2 - trackRect.width / 2;
+    track.style.scrollBehavior = "auto";
+    track.scrollLeft = initialScrollLeft;
+    track.style.scrollBehavior = "";
+  }, []);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -33,6 +51,7 @@ export function GatewayCardTrack({
         const index = cards.indexOf(entry.target as HTMLElement);
         if (index >= 0) visibility[index] = entry.intersectionRatio;
       }
+      if (visibility.every((ratio) => ratio === 0)) return;
       setActiveIndex(getActiveGatewayIndex(visibility));
     }, { root: track, threshold: [0, 0.25, 0.5, 0.75, 1] });
 
@@ -47,7 +66,7 @@ export function GatewayCardTrack({
         data-gateway-track
         role="region"
         aria-label="Storefront cards"
-        className="flex w-[calc(100%+2rem)] -mx-4 px-4 gap-4 overflow-x-auto overscroll-x-contain snap-x snap-mandatory scroll-smooth [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-[calc(100%+3rem)] sm:-mx-6 sm:px-6 md:grid md:grid-cols-3 md:gap-5 lg:gap-[22px] md:overflow-visible md:snap-none md:scroll-auto md:px-0 md:w-[calc(100%-24px)] md:mx-auto items-stretch md:my-0"
+        className="flex w-[calc(100%+2rem)] -mx-4 px-[16vw] gap-3 py-3 -my-3 overflow-x-auto overscroll-x-contain snap-x snap-mandatory scroll-smooth [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-[calc(100%+3rem)] sm:-mx-6 md:grid md:grid-cols-3 md:gap-5 lg:gap-[22px] md:overflow-visible md:snap-none md:scroll-auto md:p-0 md:w-[calc(100%-24px)] md:mx-auto items-stretch md:my-0"
       >
         {children}
       </div>

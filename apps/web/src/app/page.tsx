@@ -153,7 +153,8 @@ export default function GatewayPage() {
               href={card.link}
               prefetch={false}
               data-storefront={card.slug}
-              className="group relative flex w-[82vw] shrink-0 snap-center flex-col rounded-[24px] sm:rounded-[28px] overflow-hidden bg-white shadow-subtle hover:shadow-hover border border-brand-border/60 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 h-auto md:w-auto md:shrink md:h-[490px] lg:h-[515px] xl:h-[535px]"
+              className="group relative flex w-[68vw] shrink-0 snap-center flex-col rounded-[24px] sm:rounded-[28px] overflow-hidden bg-white border border-brand-border/60 max-md:border-[color:var(--gateway-card-border)] shadow-[0_10px_30px_rgba(63,43,36,0.10)] md:shadow-subtle md:hover:shadow-hover transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 h-auto md:w-auto md:shrink md:h-[490px] lg:h-[515px] xl:h-[535px]"
+              style={{ "--gateway-card-border": `${card.accentColor}45` } as React.CSSProperties}
             >
               {/* Upper Image Section (~64%) */}
               <div className="relative w-full aspect-[4/5] sm:aspect-[3/4] md:aspect-auto md:h-[64%] overflow-hidden bg-brand-surface-soft shrink-0">
