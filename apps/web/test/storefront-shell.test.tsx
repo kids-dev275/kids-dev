@@ -5,6 +5,7 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import GatewayPage from "../src/app/page";
+import { getActiveGatewayIndex } from "../src/components/gateway/gateway-card-track";
 import { AnnouncementBar } from "../src/components/shell/announcement-bar";
 import { Header } from "../src/components/shell/header";
 import { MobileNav } from "../src/components/shell/mobile-nav";
@@ -161,6 +162,24 @@ async function runSuite() {
       assert(card.includes("border bg-transparent"), `${slug} CTA should be outlined`);
       assert(card.includes("group-focus-visible:ring-2"), `${slug} CTA should show focus`);
     }
+  });
+
+  await runTest("5c. Mobile Gateway exposes one swipe track and initial progress", () => {
+    const html = renderToStaticMarkup(<GatewayPage />);
+    assert(html.includes("Choose Your Storefront"));
+    assert(html.includes("Explore styles curated by age and stage."));
+    assert.equal((html.match(/data-gateway-track=/g) || []).length, 1);
+    assert(html.includes('role="region"'));
+    assert(html.includes('aria-label="Storefront cards"'));
+    assert.equal((html.match(/data-active="true"/g) || []).length, 1);
+    assert.equal((html.match(/data-active="false"/g) || []).length, 2);
+    assert(html.includes("Mini Sprouts, card 1 of 3"));
+  });
+
+  await runTest("5d. Gateway progress selects the most visible card", () => {
+    assert.equal(getActiveGatewayIndex([1, 0.1, 0]), 0);
+    assert.equal(getActiveGatewayIndex([0.2, 0.95, 0.1]), 1);
+    assert.equal(getActiveGatewayIndex([0, 0.2, 1]), 2);
   });
 
   // ============================================================================

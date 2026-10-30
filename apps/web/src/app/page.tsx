@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
+import { GatewayCardTrack } from "@/components/gateway/gateway-card-track";
 
 export const metadata: Metadata = {
   title: "Kids Wear",
@@ -139,16 +140,20 @@ export default function GatewayPage() {
       {/* Main Storefront Cards Area */}
       <main
         id="main-content"
-        className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-6 py-3 sm:py-4 lg:pt-[14px] lg:pb-5 flex flex-col justify-center md:justify-start items-center min-h-0"
+        className="flex-1 w-full max-w-[1240px] mx-auto px-4 sm:px-6 pt-5 pb-4 sm:py-4 lg:pt-[14px] lg:pb-5 flex flex-col justify-start items-center min-h-0"
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-[22px] items-stretch w-full md:w-[calc(100%-24px)] mx-auto my-auto md:my-0">
+        <div className="mb-5 text-center md:hidden">
+          <h2 className="font-editorial text-[23px] leading-tight text-brand-ink">Choose Your Storefront</h2>
+          <p className="mt-2 font-sans text-xs leading-relaxed text-brand-muted">Explore styles curated by age and stage.</p>
+        </div>
+        <GatewayCardTrack indicators={GATEWAY_CARDS.map(({ slug, title, accentColor }) => ({ slug, title, accentColor }))}>
           {GATEWAY_CARDS.map((card) => (
             <Link
               key={card.slug}
               href={card.link}
               prefetch={false}
               data-storefront={card.slug}
-              className="group relative flex flex-col rounded-[24px] sm:rounded-[28px] overflow-hidden bg-white shadow-subtle hover:shadow-hover border border-brand-border/60 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 h-auto md:h-[490px] lg:h-[515px] xl:h-[535px]"
+              className="group relative flex w-[82vw] shrink-0 snap-center flex-col rounded-[24px] sm:rounded-[28px] overflow-hidden bg-white shadow-subtle hover:shadow-hover border border-brand-border/60 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-champagne focus-visible:ring-offset-2 h-auto md:w-auto md:shrink md:h-[490px] lg:h-[515px] xl:h-[535px]"
             >
               {/* Upper Image Section (~64%) */}
               <div className="relative w-full aspect-[4/5] sm:aspect-[3/4] md:aspect-auto md:h-[64%] overflow-hidden bg-brand-surface-soft shrink-0">
@@ -199,7 +204,7 @@ export default function GatewayPage() {
 
                     {/* Storefront Title */}
                     <h2
-                      className="font-editorial text-[28px] sm:text-[30px] lg:text-[32px] leading-tight font-normal tracking-tight"
+                      className="font-editorial text-[32px] sm:text-[34px] md:text-[30px] lg:text-[32px] leading-tight font-normal tracking-tight"
                       style={{ color: card.textColor }}
                     >
                       {card.title}
@@ -207,7 +212,7 @@ export default function GatewayPage() {
 
                     {/* Age Range */}
                     <p
-                      className="font-editorial text-[26px] sm:text-[28px] lg:text-[30px] leading-tight mt-1"
+                      className="font-editorial text-[30px] sm:text-[32px] md:text-[28px] lg:text-[30px] leading-tight mt-1"
                       style={{ color: card.textColor }}
                     >
                       {card.age}
@@ -217,7 +222,7 @@ export default function GatewayPage() {
                   {/* CTA Button */}
                   <div className="w-full mt-3 sm:mt-4">
                     <span
-                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 border bg-transparent py-2 px-4 rounded-md font-sans text-sm font-medium tracking-wide transition-colors duration-200 group-hover:bg-white/70 group-active:bg-white focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-offset-2"
+                      className="w-full min-h-[50px] md:min-h-[44px] inline-flex items-center justify-center gap-2 border bg-transparent py-2 px-4 rounded-md font-sans text-base md:text-sm font-medium tracking-wide transition-colors duration-200 group-hover:bg-white/70 group-active:bg-white focus-visible:outline-none group-focus-visible:ring-2 group-focus-visible:ring-offset-2"
                       style={{ borderColor: card.accentColor, color: card.textColor }}
                     >
                       <span>Explore collection</span>
@@ -228,7 +233,7 @@ export default function GatewayPage() {
               </div>
             </Link>
           ))}
-        </div>
+        </GatewayCardTrack>
       </main>
 
     </div>
