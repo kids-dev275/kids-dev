@@ -147,13 +147,19 @@ async function runSuite() {
     assert(!html.includes("Playful Outfits for Their Brightest Days"));
     assert(!html.includes("Trendy Styles for Every Mood"));
     assert(!html.includes("Modern Looks for What’s Next"));
-    for (const slug of ["mini-sprouts", "teen-studio", "aura-studio"]) {
+    for (const [slug, name, age] of [
+      ["mini-sprouts", "Mini Sprouts", "0–10 Years"],
+      ["teen-studio", "Teen Studio", "11–16 Years"],
+      ["aura-studio", "Aura Studio", "17+ Years"],
+    ]) {
       const card = html.match(new RegExp(`<a[^>]*data-storefront="${slug}"[\\s\\S]*?<\\/a>`))?.[0];
       assert(card, `${slug} card must render`);
       assert(card.includes(`href="/${slug}"`));
+      assert(card.includes(name) && card.includes(age), `${slug} identity must remain complete`);
+      assert(card.indexOf(name) < card.indexOf(age), `${slug} name must precede age`);
+      assert(card.indexOf(age) < card.indexOf("Explore collection"), `${slug} age must precede CTA`);
       assert(card.includes("border bg-transparent"), `${slug} CTA should be outlined`);
       assert(card.includes("group-focus-visible:ring-2"), `${slug} CTA should show focus`);
-      assert(card.includes("font-editorial text-lg sm:text-xl"), `${slug} age should be prominent`);
     }
   });
 
@@ -360,6 +366,28 @@ async function runSuite() {
     );
     assert(html.includes("Shop Silk Collection"), "Hero must render cta label");
     assert(html.includes('href="/mini-sprouts/shop"'), "Hero must render cta link");
+    assert(html.includes("0–10 Years"), "Hero must render the storefront age badge");
+    const cta = html.match(/<a[^>]*href="\/mini-sprouts\/shop"[^>]*>[\s\S]*?<\/a>/)?.[0];
+    assert(cta, "Hero must render the configured CTA");
+    assert(cta.includes("Shop Silk Collection"), "Hero CTA must retain the configured label");
+    assert(!cta.includes("<svg"), "Hero CTA should omit the trailing arrow");
+    assert(cta.includes("border-2") && cta.includes("bg-white/90"), "Hero CTA should be outlined");
+    assert(cta.includes("hover:bg-[var(--color-storefront-contrast)]"), "Hero CTA should have a themed hover state");
+    assert(cta.includes("focus-visible:ring-2"), "Hero CTA should show keyboard focus");
+  });
+
+  await runTest("17a. All Hero badges and configured CTA routes stay storefront-specific", () => {
+    for (const [slug, age, label] of [
+      ["mini-sprouts", "0–10 Years", "Shop Mini Sprouts"],
+      ["teen-studio", "11–16 Years", "Shop Teen Studio"],
+      ["aura-studio", "17+ Years", "Shop Aura Studio"],
+    ] as const) {
+      const html = renderToStaticMarkup(<HeroSlider slides={[]} storefront={slug} />);
+      assert(html.includes(age), `${slug} badge must use its age range`);
+      assert(html.includes(label), `${slug} CTA must retain its configured label`);
+      assert(html.includes(`href="/${slug}/shop"`), `${slug} CTA must retain its route`);
+      assert(html.includes('aria-label="Previous slide"') && html.includes('aria-label="Next slide"'));
+    }
   });
 
   await runTest("18. local Hero fallback has valid slides and controls", () => {

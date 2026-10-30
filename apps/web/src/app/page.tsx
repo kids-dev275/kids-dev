@@ -207,7 +207,7 @@ export default function GatewayPage() {
 
                     {/* Age Range */}
                     <p
-                      className="font-editorial text-lg sm:text-xl leading-tight mt-1"
+                      className="font-editorial text-[26px] sm:text-[28px] lg:text-[30px] leading-tight mt-1"
                       style={{ color: card.textColor }}
                     >
                       {card.age}

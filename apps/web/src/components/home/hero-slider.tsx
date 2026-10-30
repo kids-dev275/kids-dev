@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOptimizedMediaUrl } from "@kids-wear/shared";
 import type { ApiHeroSlide } from "@/lib/api";
 import { STOREFRONT_THEMES, StorefrontSlug } from "@/components/theme/storefront-tokens";
@@ -162,8 +162,7 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
               </p>
             )}
             <span
-              className={`inline-block text-xs font-sans font-semibold uppercase tracking-widest ${usingFallback ? "text-[var(--color-storefront-contrast)]" : "rounded-full px-3 py-1 text-white"}`}
-              style={!usingFallback ? { backgroundColor: currentTheme.primaryAccent } : undefined}
+              className="inline-block rounded-full bg-[var(--color-storefront-contrast)] px-4 py-1.5 text-[15px] leading-tight font-sans font-semibold uppercase tracking-widest text-white"
             >
               {currentTheme.ageRange}
             </span>
@@ -188,10 +187,9 @@ export function HeroSlider({ slides = [], storefront, className = "" }: HeroSlid
               <div className="pt-2">
                 <Link
                   href={slide.ctaLink}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-sans font-semibold text-white bg-[var(--color-storefront-contrast)] hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white shadow-subtle"
+                  className="inline-flex min-h-[50px] w-full max-w-[240px] items-center justify-center rounded-sm border-2 border-[var(--color-storefront-contrast)] bg-white/90 px-6 py-3 text-center font-sans text-[15px] font-medium text-[var(--color-storefront-contrast)] transition-colors duration-200 hover:bg-[var(--color-storefront-contrast)] hover:text-white active:bg-[var(--color-storefront-accent-hover)] active:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-storefront-contrast)] focus-visible:ring-offset-2 sm:w-[232px]"
                 >
                   <span>{slide.ctaLabel}</span>
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </div>
             )}
