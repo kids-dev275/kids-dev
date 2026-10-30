@@ -44,7 +44,7 @@ export function Header({ storefront }: { storefront: StorefrontSlug }) {
             </span>
           </Link>
           <Link href="/" aria-label="Kids Wear gateway" className="absolute left-1/2 -translate-x-1/2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront">
-            <Image src="/brand/kids-wear-logo.webp" alt="Kids Wear" width={84} height={55} className="h-auto w-[52px] object-contain min-[390px]:w-[56px]" />
+            <Image src="/brand/kids-wear-logo.webp" alt="Kids Wear" width={84} height={55} loading="eager" className="h-auto w-[52px] object-contain min-[390px]:w-[56px]" />
           </Link>
           <div className="flex items-center">
             <Link

@@ -329,6 +329,7 @@ async function runSuite() {
       );
       assert(mobile.includes(STOREFRONT_THEMES[storefront].name));
       assert(mobile.includes('alt="Kids Wear"'));
+      assert(mobile.includes('loading="eager"'));
       assert(mobile.includes(`aria-label="Search ${STOREFRONT_THEMES[storefront].name}"`));
       assert(mobile.includes('aria-label="Shopping Cart"'));
       assert(mobile.includes('aria-label="Open navigation menu"'));
