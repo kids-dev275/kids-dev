@@ -219,10 +219,22 @@ export async function uploadSignedProductFile(
   if (mediaType === "VIDEO" && signData.transformation) {
     formData.append("transformation", signData.transformation);
   }
-  const response = await fetcher(
-    `https://api.cloudinary.com/v1_1/${signData.cloudName}/${resourceType}/upload`,
-    { method: "POST", body: formData }
-  );
+  let response: Response;
+  try {
+    response = await fetcher(
+      `https://api.cloudinary.com/v1_1/${signData.cloudName}/${resourceType}/upload`,
+      { method: "POST", body: formData }
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error(`The media provider took too long to respond to the ${resourceType} upload. Please try again.`);
+    }
+    if (error instanceof TypeError) {
+      throw new Error(`Could not connect to the media provider for the ${resourceType} upload. Please try again.`);
+    }
+    throw error;
+  }
   if (!response.ok) throw new Error(`Failed to upload ${resourceType} to media provider.`);
   const result = await response.json();
   if (typeof result.public_id !== "string" || !result.public_id) {

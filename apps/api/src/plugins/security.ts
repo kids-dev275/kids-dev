@@ -39,11 +39,19 @@ export async function registerSecurityPlugins(app: FastifyInstance): Promise<voi
         return;
       }
 
+      let rejectedOrigin = "[invalid origin]";
+      try {
+        rejectedOrigin = new URL(origin).origin;
+      } catch {
+        // Keep unparseable Origin values out of logs.
+      }
+      app.log.warn({ event: "cors_origin_rejected", origin: rejectedOrigin }, "CORS origin rejected");
       cb(new Error("CORS policy violation: Origin not allowed"), false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token", "X-Request-ID"],
+    exposedHeaders: ["X-Request-ID"],
   });
 
   // Rate Limiting (localhost exempt in non-production to allow local test suites to execute without throttling)

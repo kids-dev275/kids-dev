@@ -8,6 +8,7 @@
  */
 
 import { getApiBaseUrl } from "./api";
+import { classifyAdminRequestError } from "./admin-request-error";
 import type {
   AdminDashboardData,
   AdminOrdersResponseData,
@@ -27,6 +28,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
+    requestId?: string;
   };
 }
 
@@ -202,11 +204,21 @@ let cachedCsrfToken: string | null = null;
 
 export async function getAdminCsrfToken(): Promise<string> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/admin/auth/csrf`, {
-    method: "GET",
-    credentials: "include",
-    cache: "no-store",
-  });
+  const requestId = crypto.randomUUID();
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/admin/auth/csrf`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch (error) {
+    const category = classifyAdminRequestError(error).code;
+    if (category !== "REQUEST_ABORTED") {
+      console.warn("[Admin API] CSRF request failed", { clientAttemptId: requestId, category });
+    }
+    throw error;
+  }
   if (!res.ok) {
     throw new Error("Failed to fetch admin CSRF token");
   }
@@ -226,8 +238,11 @@ async function adminFetch<T>(
   const baseUrl = getApiBaseUrl();
   const method = (options.method || "GET").toUpperCase();
   const headers = new Headers(options.headers);
+  const requestId = crypto.randomUUID();
+  const isMutation = ["POST", "PATCH", "PUT", "DELETE"].includes(method);
+  if (isMutation) headers.set("X-Request-ID", requestId);
 
-  if (["POST", "PATCH", "PUT", "DELETE"].includes(method)) {
+  if (isMutation) {
     if (!cachedCsrfToken) {
       try {
         await getAdminCsrfToken();
@@ -270,27 +285,25 @@ async function adminFetch<T>(
       return {
         success: false,
         error: {
-          code: "UNKNOWN_ERROR",
+          code: "HTTP_ERROR",
           message: `Request failed with status ${res.status}`,
+          requestId: res.headers.get("X-Request-ID") ?? (isMutation ? requestId : undefined),
         },
       };
     }
 
+    if (!json.success && json.error) {
+      return { ...json, error: { ...json.error, requestId: res.headers.get("X-Request-ID") ?? (isMutation ? requestId : undefined) } };
+    }
     return json;
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return {
-        success: false,
-        error: { code: "REQUEST_ABORTED", message: "Request cancelled." },
-      };
+    const error = classifyAdminRequestError(err);
+    if (error.code !== "REQUEST_ABORTED") {
+      console.warn("[Admin API] Request failed", { requestId: isMutation ? requestId : undefined, clientAttemptId: isMutation ? undefined : requestId, method, path: endpoint.split("?")[0], category: error.code });
     }
-    const message = err instanceof Error ? err.message : "Network error";
     return {
       success: false,
-      error: {
-        code: "NETWORK_ERROR",
-        message,
-      },
+      error: { ...error, requestId: isMutation ? requestId : undefined },
     };
   }
 }

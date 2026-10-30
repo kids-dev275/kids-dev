@@ -109,7 +109,20 @@ export function errorHandler(
   }
 
   // Unexpected / 500 internal errors
-  request.log.error(error);
+  const rawCode = "code" in error ? error.code : undefined;
+  const errorCode = typeof rawCode === "string" && /^[A-Z][A-Z0-9_]{1,40}$/.test(rawCode)
+    ? rawCode
+    : "UNEXPECTED_ERROR";
+  const stackFrames = error.stack?.split("\n").slice(1).filter((line) => /^\s+at\s+/.test(line)).slice(0, 5);
+  request.log.error({
+    event: "api_unhandled_error",
+    requestId: request.id,
+    method: request.method,
+    path: request.url.split("?")[0],
+    errorCode,
+    errorCategory: /^P\d{4}$/.test(errorCode) ? "database" : "api",
+    stackFrames,
+  }, "Unhandled API error");
 
   const response: ApiErrorResponse = {
     success: false,

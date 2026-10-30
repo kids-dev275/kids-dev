@@ -101,6 +101,10 @@ async function run(): Promise<void> {
     }
   );
   assert.equal(imageId, signData.publicId);
+  await assert.rejects(
+    uploadSignedProductFile(normalized, signData, "IMAGE", async () => { throw new TypeError("Failed to fetch"); }),
+    /Could not connect to the media provider for the image upload/
+  );
 
   const validVideo = new File(["mp4"], "romper.mp4", { type: "video/mp4" });
   assert.equal(getVideoFileError(validVideo), null);

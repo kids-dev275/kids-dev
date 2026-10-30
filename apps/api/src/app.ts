@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from "fastify";
+import { randomUUID } from "node:crypto";
 import { API_V1_PREFIX } from "@kids-wear/shared";
 import { env } from "./config/env";
 import { registerSecurityPlugins } from "./plugins/security";
@@ -23,6 +24,15 @@ import { reviewRoutes } from "./modules/review/routes";
 import { adminReviewRoutes } from "./modules/review/admin-routes";
 import { adminDashboardRoutes } from "./modules/admin-dashboard/routes";
 
+function safeOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "[invalid origin]";
+  }
+}
+
 /**
  * Builds and configures the Fastify application instance.
  */
@@ -30,6 +40,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     bodyLimit: 1048576, // 1 MiB global limit for JSON payload protection
     trustProxy: env.TRUST_PROXY,
+    requestIdHeader: false,
+    genReqId: (request) => {
+      const supplied = request.headers["x-request-id"];
+      return typeof supplied === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(supplied)
+        ? supplied
+        : randomUUID();
+    },
     logger: {
       level: env.NODE_ENV === "production" ? "info" : "debug",
       redact: {
@@ -58,6 +75,38 @@ export async function buildApp(): Promise<FastifyInstance> {
         censor: "[REDACTED]",
       },
     },
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("X-Request-ID", request.id);
+  });
+  app.addHook("onResponse", async (request, reply) => {
+    request.log.info({
+      event: "api_response",
+      requestId: request.id,
+      method: request.method,
+      path: request.url.split("?")[0],
+      origin: safeOrigin(request.headers.origin),
+      status: reply.statusCode,
+      errorCategory: reply.statusCode >= 500 ? "server" : reply.statusCode >= 400 ? "client" : null,
+      durationMs: Math.round(reply.elapsedTime),
+    }, "API response sent");
+  });
+  app.addHook("onRequestAbort", async (request) => {
+    request.log.warn({
+      event: "api_request_aborted",
+      requestId: request.id,
+      method: request.method,
+      path: request.url.split("?")[0],
+    }, "API request aborted");
+  });
+  app.addHook("onTimeout", async (request) => {
+    request.log.warn({
+      event: "api_request_timeout",
+      requestId: request.id,
+      method: request.method,
+      path: request.url.split("?")[0],
+    }, "API request timed out");
   });
 
   // Centralized Error and Not Found Handlers
