@@ -7,7 +7,7 @@ import { Search, ShoppingBag, User } from "lucide-react";
 import { STOREFRONT_THEMES, type StorefrontSlug } from "@/components/theme/storefront-tokens";
 import { StorefrontIdentityIcon } from "@/components/theme/storefront-identity-icon";
 import { CartUnitBadge } from "@/components/cart/cart-badge";
-import { MobileNav } from "./mobile-nav";
+import { MobileNav, TabletNav } from "./mobile-nav";
 
 export function Header({ storefront }: { storefront: StorefrontSlug }) {
   const theme = STOREFRONT_THEMES[storefront];
@@ -25,9 +25,47 @@ export function Header({ storefront }: { storefront: StorefrontSlug }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur-md max-md:shadow-[0_2px_12px_rgba(63,43,36,0.05)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-20 items-center justify-between gap-3 py-2 max-[419px]:flex-wrap max-[419px]:gap-y-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] lg:gap-4">
+        <div data-testid="mobile-storefront-header" className="flex h-[72px] items-center justify-between md:hidden">
+          <Link
+            href={`/${storefront}`}
+            prefetch={false}
+            className="flex min-w-0 items-start gap-1 leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+          >
+            <StorefrontIdentityIcon storefront={storefront} className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--color-storefront-contrast)]" />
+            <span className="flex flex-col">
+              <span className="whitespace-nowrap font-editorial text-[18px] text-[var(--color-storefront-contrast)] min-[390px]:text-[19px]">
+                {theme.name}
+              </span>
+              <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-text-muted">
+                {theme.ageRange}
+              </span>
+            </span>
+          </Link>
+          <Link href="/" aria-label="Kids Wear gateway" className="absolute left-1/2 -translate-x-1/2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront">
+            <Image src="/brand/kids-wear-logo.webp" alt="Kids Wear" width={84} height={55} className="h-auto w-[52px] object-contain min-[390px]:w-[56px]" />
+          </Link>
+          <div className="flex items-center">
+            <Link
+              href={`/${storefront}/search`}
+              aria-label={`Search ${theme.name}`}
+              className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+            >
+              <Search className="h-5 w-5" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/cart"
+              aria-label="Shopping Cart"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+            >
+              <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+              <CartUnitBadge />
+            </Link>
+            <MobileNav storefront={storefront} />
+          </div>
+        </div>
+        <div data-testid="tablet-desktop-storefront-header" className="hidden min-h-20 items-center justify-between gap-3 py-2 md:flex lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] lg:gap-4">
           <div className="flex items-center gap-2 max-[419px]:w-full sm:gap-5 lg:gap-2 xl:gap-3">
             <Link
               href={`/${storefront}`}
@@ -98,7 +136,7 @@ export function Header({ storefront }: { storefront: StorefrontSlug }) {
             >
               <User className="h-5 w-5" aria-hidden="true" />
             </Link>
-            <MobileNav storefront={storefront} />
+            <TabletNav storefront={storefront} />
           </div>
         </div>
       </div>

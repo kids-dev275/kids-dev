@@ -8,7 +8,7 @@ import GatewayPage from "../src/app/page";
 import { getActiveGatewayIndex, INITIAL_GATEWAY_INDEX } from "../src/components/gateway/gateway-card-track";
 import { AnnouncementBar } from "../src/components/shell/announcement-bar";
 import { Header } from "../src/components/shell/header";
-import { MobileNav } from "../src/components/shell/mobile-nav";
+import { getMobileNavLinks, MobileNav } from "../src/components/shell/mobile-nav";
 import { StorefrontSwitcher } from "../src/components/shell/storefront-switcher";
 import { Footer } from "../src/components/shell/footer";
 import { StorefrontShell } from "../src/components/shell/storefront-shell";
@@ -311,13 +311,41 @@ async function runSuite() {
       "Initial mobile trigger must have aria-expanded=false"
     );
     assert(
-      html.includes('aria-label="Open main menu"'),
+      html.includes('aria-label="Open navigation menu"'),
       "Initial mobile trigger must have open label"
     );
     assert(
       html.includes('aria-controls="mobile-navigation-drawer"'),
       "Must link trigger to drawer id"
     );
+  });
+
+  await runTest("13a. phone header keeps store identity and shopping actions without account icon", () => {
+    for (const storefront of ["mini-sprouts", "teen-studio", "aura-studio"] as const) {
+      const html = renderToStaticMarkup(<Header storefront={storefront} />);
+      const mobile = html.slice(
+        html.indexOf('data-testid="mobile-storefront-header"'),
+        html.indexOf('data-testid="tablet-desktop-storefront-header"')
+      );
+      assert(mobile.includes(STOREFRONT_THEMES[storefront].name));
+      assert(mobile.includes('alt="Kids Wear"'));
+      assert(mobile.includes(`aria-label="Search ${STOREFRONT_THEMES[storefront].name}"`));
+      assert(mobile.includes('aria-label="Shopping Cart"'));
+      assert(mobile.includes('aria-label="Open navigation menu"'));
+      assert(!mobile.includes('aria-label="Customer Account"'));
+      assert(html.includes('data-testid="tablet-desktop-storefront-header"'));
+      assert(html.includes('aria-label="Customer Account"'));
+    }
+  });
+
+  await runTest("13b. phone menu has six scoped destinations and a single active page", () => {
+    const home = getMobileNavLinks("mini-sprouts", "/mini-sprouts");
+    assert.deepEqual(home.map(({ label }) => label), ["Home", "Shop", "New Arrivals", "Reviews", "Contact", "My Account"]);
+    assert.deepEqual(home.filter(({ active }) => active).map(({ label }) => label), ["Home"]);
+    assert.equal(home.find(({ label }) => label === "Shop")?.href, "/mini-sprouts/shop");
+    assert.equal(home.find(({ label }) => label === "My Account")?.href, "/account");
+    assert.deepEqual(getMobileNavLinks("teen-studio", "/teen-studio/shop").filter(({ active }) => active).map(({ label }) => label), ["Shop"]);
+    assert.deepEqual(getMobileNavLinks("aura-studio", "/account/profile").filter(({ active }) => active).map(({ label }) => label), ["My Account"]);
   });
 
   await runTest("14. no Wishlist navigation exists", () => {

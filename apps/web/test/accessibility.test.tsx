@@ -160,7 +160,7 @@ async function runSuite() {
         html.includes('aria-controls="mobile-navigation-drawer"'),
         "Toggle must declare aria-controls"
       );
-      assert(html.includes('aria-label="Open main menu"'), "Toggle must declare aria-label");
+      assert(html.includes('aria-label="Open navigation menu"'), "Toggle must declare aria-label");
     }
   );
 

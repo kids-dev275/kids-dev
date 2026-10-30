@@ -15,11 +15,78 @@ export interface MobileNavProps {
 
 const STOREFRONT_SLUGS: StorefrontSlug[] = ["mini-sprouts", "teen-studio", "aura-studio"];
 
+export function getMobileNavLinks(storefront: StorefrontSlug, pathname: string | null) {
+  return [
+    { label: "Home", href: `/${storefront}`, active: pathname === `/${storefront}` },
+    { label: "Shop", href: `/${storefront}/shop`, active: pathname === `/${storefront}/shop` },
+    { label: "New Arrivals", href: `/${storefront}/new-arrivals`, active: pathname === `/${storefront}/new-arrivals` },
+    { label: "Reviews", href: `/${storefront}#reviews`, active: pathname === "/reviews" },
+    { label: "Contact", href: `/${storefront}#contact`, active: pathname === "/contact" },
+    { label: "My Account", href: "/account", active: pathname?.startsWith("/account") ?? false },
+  ];
+}
+
+/** Full-width navigation sheet for phone viewports. */
+export function MobileNav({ storefront }: MobileNavProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setIsOpen(false);
+  }
+
+  const close = () => setIsOpen(false);
+  const menuRef = useFocusTrap<HTMLDivElement>({ isOpen, onClose: close, triggerRef: toggleButtonRef });
+  const navLinks = getMobileNavLinks(storefront, pathname);
+
+  return (
+    <div ref={menuRef} className="md:hidden">
+      <button
+        ref={toggleButtonRef}
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+        aria-controls="mobile-navigation-drawer"
+        aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
+        className="flex h-11 w-11 items-center justify-center rounded-full text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
+      >
+        {isOpen ? <X className="h-[22px] w-[22px]" aria-hidden="true" /> : <Menu className="h-[22px] w-[22px]" aria-hidden="true" />}
+      </button>
+      {isOpen && (
+        <div
+          id="mobile-navigation-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile Navigation"
+          className="absolute inset-x-0 top-full z-20 h-[calc(100dvh-72px)] overflow-y-auto border-t border-border bg-surface shadow-[0_12px_24px_rgba(63,43,36,0.08)] animate-[mobile-nav-enter_180ms_ease-out_both]"
+        >
+          <nav aria-label="Mobile Menu Links" className="mx-auto flex max-w-7xl flex-col px-6 py-5">
+            {navLinks.map(({ label, href, active }) => (
+              <Link
+                key={label}
+                href={href}
+                onClick={close}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-16 items-center border-b border-border/70 font-sans text-[20px] font-medium transition-colors last:border-b-0 hover:text-[var(--color-storefront-contrast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront focus-visible:ring-inset ${active ? "text-[var(--color-storefront-contrast)] underline decoration-accent-storefront underline-offset-4" : "text-ink"}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
- * MobileNav provides an accessible slide-over navigation drawer for mobile viewports.
+ * TabletNav preserves the existing slide-over navigation drawer for tablet viewports.
  * Handles keyboard escape dismissal, body scroll lock, route-change closing, focus trapping, and ARIA state.
  */
-export function MobileNav({ storefront }: MobileNavProps) {
+export function TabletNav({ storefront }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const toggleButtonRef = useRef<HTMLButtonElement>(null);
@@ -52,14 +119,14 @@ export function MobileNav({ storefront }: MobileNavProps) {
   ];
 
   return (
-    <div className="lg:hidden">
+    <div className="hidden md:block lg:hidden">
       {/* Trigger Button */}
       <button
         ref={toggleButtonRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-expanded={isOpen}
-        aria-controls="mobile-navigation-drawer"
+        aria-controls="tablet-navigation-drawer"
         aria-label={isOpen ? "Close main menu" : "Open main menu"}
         className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center rounded-md text-ink hover:text-accent-storefront hover:bg-surface-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-storefront"
       >
@@ -88,7 +155,7 @@ export function MobileNav({ storefront }: MobileNavProps) {
           {/* Drawer Content */}
           <div
             ref={drawerRef}
-            id="mobile-navigation-drawer"
+            id="tablet-navigation-drawer"
             className="relative ml-auto w-full max-w-xs bg-surface h-full shadow-lg flex flex-col justify-between p-6 z-10 overflow-y-auto"
           >
             <div>
