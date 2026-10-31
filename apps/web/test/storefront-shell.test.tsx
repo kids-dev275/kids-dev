@@ -12,7 +12,7 @@ import { getMobileNavLinks, MobileNav } from "../src/components/shell/mobile-nav
 import { StorefrontSwitcher } from "../src/components/shell/storefront-switcher";
 import { Footer } from "../src/components/shell/footer";
 import { StorefrontShell } from "../src/components/shell/storefront-shell";
-import { HeroSlider } from "../src/components/home/hero-slider";
+import { getMostVisibleHeroSlideIndex, HeroSlider } from "../src/components/home/hero-slider";
 import { StorefrontHomeSections } from "../src/components/home/storefront-home-sections";
 import { ShopByAge } from "../src/components/home/shop-by-age";
 import { NewArrivalsSection } from "../src/components/home/new-arrivals-section";
@@ -481,6 +481,44 @@ async function runSuite() {
     );
     assert(html.includes("desktop-1920x800.jpg"), "Must contain desktop image source");
     assert(html.includes("mobile-1080x1350.jpg"), "Must contain mobile image source");
+  });
+
+  await runTest("19a. Hero keeps every configured slide in one snap track with desktop controls", () => {
+    const slides: ApiHeroSlide[] = [1, 2, 3].map((number) => ({
+      id: `hero-${number}`,
+      storefrontId: "mini-sprouts",
+      heading: `Hero ${number}`,
+      text: `Slide ${number} copy`,
+      ctaLabel: `Shop slide ${number}`,
+      ctaLink: "/mini-sprouts/shop",
+      sortOrder: number,
+      isActive: true,
+      desktopImageAsset: {
+        id: `hero-image-${number}`,
+        secureUrl: `/images/hero-${number}.jpg`,
+        width: 1920,
+        height: 800,
+        format: "jpg",
+      },
+      mobileImageAsset: null,
+    }));
+    const html = renderToStaticMarkup(<HeroSlider slides={slides} storefront="mini-sprouts" />);
+    assert(html.includes("data-hero-track"));
+    assert.equal((html.match(/data-hero-slide="true"/g) || []).length, 3);
+    assert(html.indexOf("Hero 1") < html.indexOf("Hero 2"));
+    assert(html.indexOf("Hero 2") < html.indexOf("Hero 3"));
+    assert.equal((html.match(/href="\/mini-sprouts\/shop"/g) || []).length, 3);
+    assert(html.includes('aria-label="Previous slide"'));
+    assert(html.includes('aria-label="Next slide"'));
+    assert(html.includes('aria-label="Go to slide 3 of 3"'));
+    assert.equal((html.match(/aria-selected="true"/g) || []).length, 1);
+  });
+
+  await runTest("19b. Hero indicator selects the most visible snapped slide", () => {
+    assert.equal(getMostVisibleHeroSlideIndex([1, 0, 0]), 0);
+    assert.equal(getMostVisibleHeroSlideIndex([0.1, 0.8, 0.1]), 1);
+    assert.equal(getMostVisibleHeroSlideIndex([0, 0.2, 1]), 2);
+    assert.equal(getMostVisibleHeroSlideIndex([0, 0, 0]), null);
   });
 
   await runTest("20. New Arrivals uses ProductCard primitive", () => {
